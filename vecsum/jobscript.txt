@@ -1,0 +1,16 @@
+#!/ b i n / b a s h
+#PBS -N test
+#PBS -lnodes=4:ppn=12:default
+#PBS -lwalltime=00:00:01
+#PBS -lpmem=2000MB
+#PBS -W grouplist=<insert>
+#PBS -A freecycle
+#PBS -q optimist
+#PBS -j oe
+
+cd ${PBS O WORKDIR}
+
+module load intelcomp
+module load openmpi/1.4.3-intel
+KMP_AFFINITY="granularity=fine,compact"
+OMP_NUM_THREADS=4 mpirun -npernode 4 ./serial 1024
