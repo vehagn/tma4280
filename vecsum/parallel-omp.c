@@ -23,6 +23,8 @@ int main(int argc, char** argv)
     }
     int n = atoi(argv[1]);
 
+    printf("OpenMP\tThreadcount: %i\n",omp_get_max_threads());
+
     double* v = (double*)malloc(n*sizeof(double));
     double sumn = 0;
 
@@ -37,11 +39,3 @@ int main(int argc, char** argv)
 
 return 0;
 }
-/*
-#pragma omp parallel for schedule(static) reduction(+:sumn)
-    for(int i=1; i<(n/P +1); i++){
-        v[omp_get_thread_num()*n/P + i-1] = (double)1.0/(i*i);
-        sumn += v[omp_get_thread_num()*n/P + i-1];
-        printf("Thread: %i\tIndex: %i\n",omp_get_thread_num(),omp_get_thread_num()*n/P + i-1);
-    }
-*/
