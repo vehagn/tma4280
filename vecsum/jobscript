@@ -1,9 +1,8 @@
 #!/bin/bash
 #PBS -N test
 #PBS -lnodes=4:ppn=12:default
-#PBS -lwalltime=00:00:01
+#PBS -lwalltime=00:00:40
 #PBS -lpmem=2000MB
-#PBS -W grouplist=free
 #PBS -A freecycle
 #PBS -q optimist
 #PBS -j oe
@@ -13,4 +12,7 @@ cd ${PBS_O_WORKDIR}
 module load intelcomp
 module load openmpi/1.4.3-intel
 KMP_AFFINITY="granularity=fine ,compact"
-OMP_NUM_THREADS=3 mpirun -npernode 4 ./serial 1024
+OMP_NUM_THREADS=8
+./serial 1073741824
+./omp 1073741824
+mpirun -np 8 ./mpi 1073741824
