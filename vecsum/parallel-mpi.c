@@ -60,7 +60,6 @@ int main(int argc, char** argv)
         temp[i-1] = (double)1.0/((i+rank*share)*(i+rank*share));
         sumn += temp[i-1];
     }
-    free(temp);
 
     double s2 = sumn;
     MPI_Allreduce(&s2, &sumn, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
