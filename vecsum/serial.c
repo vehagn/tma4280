@@ -29,9 +29,9 @@ int main(int argc, char** argv)
 
     time_init = walltime();
 
-    for(int i=1; i<n+1; i++){
-        v[i-1] = (double)1.0/(i*i);
-        sumn += v[i-1];
+    for(int i=n; i>0; i--){
+        v[i] = (double)1.0/(i*i);
+        sumn += v[i];
     }
     printf("Error:\t\t%.52f\nTime Elapsed:\t%f\n",sum-sumn,walltime()-time_init);
 

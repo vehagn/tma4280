@@ -58,10 +58,10 @@ int main(int argc, char** argv)
 
     time_init = walltime();
 
-    for(int i=1; i<(n/size +1); i++){
-        v[rank*n/size + (i-1)] = (double)1.0/((rank*n/size+i)*(rank*n/size+i));
-        sumn += v[rank*n/size + (i-1)];
-        //printf("Rank: %i\tIndex: %i\tSumn: %f\n",rank,rank*n/size + (i-1),sumn);
+    for (int i=n-(size-(rank+1))*n/size; i>rank*n/size; i--){      
+	v[i] = (double)1.0/(i*i);
+        sumn += v[i];
+       // printf("Rank: %i\tIndex: %i\tSumn: %f\n",rank,i,sumn);
     }
     double s2 = sumn; //What happens here?
     MPI_Allreduce(&s2, &sumn, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
