@@ -52,8 +52,8 @@ int main(int argc, char** argv)
     }
     time_init = walltime();
 
-    for (long int i=share; i>0; i--){
-        v[i-1] = (double)1.0/((i+rank*share)*(i+rank*share));
+    for (long long int i=share; i>0; i--){
+        v[i-1] = 1.0/(((double)i+rank*share)*(i+rank*share));
         sumn += v[i-1];
     }
 
