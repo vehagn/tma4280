@@ -53,12 +53,15 @@ int main(int argc, char** argv)
     double sumn = 0;
 
     time_init = walltime();
+    int share = n/size;
 
-    for (int i=n-(size-(rank+1))*n/size; i>rank*n/size; i--){
-	v[i] = (double)1.0/(i*i);
-        sumn += v[i];
-        printf("Rank: %i\tIndex: %i\tSumn: %f\n",rank,i,sumn);
+    double* temp = &v[rank];
+    for (int i=share; i>0; i--){
+        temp[i-1] = (double)1.0/((i+rank*share)*(i+rank*share));
+        sumn += temp[i-1];
     }
+    free(temp);
+
     double s2 = sumn;
     MPI_Allreduce(&s2, &sumn, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
