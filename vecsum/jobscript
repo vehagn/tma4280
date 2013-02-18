@@ -3,7 +3,7 @@
 #PBS -lnodes=4:ppn=12:default
 #PBS -lwalltime=00:00:01
 #PBS -lpmem=2000MB
-#PBS -W grouplist=<insert>
+#PBS -W grouplist=free
 #PBS -A freecycle
 #PBS -q optimist
 #PBS -j oe
