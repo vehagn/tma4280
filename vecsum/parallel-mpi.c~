@@ -40,7 +40,6 @@ int main(int argc, char** argv)
         printf("MPI   \tThreadcount: %i\n",size);
     }
 
-
     if (!isPowerOfTwo(size)){
         if (rank == 0){
         printf("The number of processors must be a power of 2, %i processors supplied.\n",size);
@@ -49,17 +48,18 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    double* v = (double*)calloc(n,sizeof(double));
+    double* v = (double*)malloc(n*sizeof(double));
     double sumn = 0;
 
     time_init = walltime();
 
-    for (int i=n-(size-(rank+1))*n/size; i>rank*n/size; i--){
+
+    for (int i=n-(size-(rank+1))*n/size; i>rank*n/size; i--){      
 	v[i] = (double)1.0/(i*i);
         sumn += v[i];
-        printf("Rank: %i\tIndex: %i\tSumn: %f\n",rank,i,sumn);
+       // printf("Rank: %i\tIndex: %i\tSumn: %f\n",rank,i,sumn);
     }
-    double s2 = sumn;
+    double s2 = sumn; //What happens here?
     MPI_Allreduce(&s2, &sumn, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     if (rank == 0){
