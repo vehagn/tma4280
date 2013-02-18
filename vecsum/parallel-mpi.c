@@ -32,6 +32,7 @@ int main(int argc, char** argv)
     int n = atoi(argv[1]);
 
     int rank = 0, size = 1;
+    double* v = (double*)calloc(n,sizeof(double));
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -39,7 +40,6 @@ int main(int argc, char** argv)
     if (rank == 0){
         printf("MPI   \tThreadcount: %i\n",size);
     }
-
 
     if (!isPowerOfTwo(size)){
         if (rank == 0){
@@ -49,9 +49,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    double* v = (double*)calloc(n,sizeof(double));
     double sumn = 0;
-
     time_init = walltime();
     int share = n/size;
 
