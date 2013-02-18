@@ -31,7 +31,7 @@ int main(int argc, char** argv)
     time_init = walltime();
 
 #pragma omp parallel for schedule(static) reduction(+:sumn)
-    for(int i=n; i>0; i--){
+    for(long int i=n; i>0; i--){
         v[i] = (double)1.0/(i*i);
         sumn += v[i];
     }

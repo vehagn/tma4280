@@ -29,7 +29,7 @@ int main(int argc, char** argv)
 
     time_init = walltime();
 
-    for(int i=n; i>0; i--){
+    for(long int i=n; i>0; i--){
         v[i] = (double)1.0/(i*i);
         sumn += v[i];
     }
