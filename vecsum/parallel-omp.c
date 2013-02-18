@@ -20,7 +20,7 @@ int main(int argc, char** argv)
         printf("Need one parameter, the size of the vector\n");
         return 1;
     }
-    long int n = 1<<30; //atoi(argv[1]);
+    long int n = atoi(argv[1]);
     printf("OpenMP\tThreadcount: %i\n",omp_get_max_threads());
     double* v = (double*)malloc(n*sizeof(double));
     double sumn = 0;

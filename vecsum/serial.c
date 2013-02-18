@@ -20,6 +20,7 @@ int main(int argc, char** argv)
         return 1;
     }
     long int n = atoi(argv[1]);
+    printf("Serial:\n");
     double* v = (double*)malloc(n*sizeof(double));
     double sumn = 0;
     time_init = walltime();
