@@ -49,7 +49,7 @@ int main(int argc, char** argv){
     double s2 = sumn;
     MPI_Reduce(&s2, &sumn, 1, MPI_DOUBLE, MPI_SUM, 0,MPI_COMM_WORLD);
 
-    if (rank == 0){
+    if(rank == 0){
         printf("Error:\t\t%e \nTime Elapsed:\t%f \n",sum-sumn,walltime()-time_init);
     }
     MPI_Finalize();
