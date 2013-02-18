@@ -31,8 +31,8 @@ int main(int argc, char** argv)
     time_init = walltime();
 
 #pragma omp parallel for schedule(static) reduction(+:sumn)
-    for(long int i=n; i>0; i--){
-        v[i] = (double)1.0/(i*i);
+    for(long long int i=n; i>0; i--){
+        v[i] = 1.0/((double)i*i);
         sumn += v[i];
     }
     printf("Error:\t\t%.52f\nTime Elapsed:\t%f\n",sum-sumn,walltime()-time_init);
