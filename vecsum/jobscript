@@ -1,4 +1,4 @@
-#!/ b i n / b a s h
+#!/bin/bash
 #PBS -N test
 #PBS -lnodes=4:ppn=12:default
 #PBS -lwalltime=00:00:01
@@ -12,5 +12,5 @@ cd ${PBS O WORKDIR}
 
 module load intelcomp
 module load openmpi/1.4.3-intel
-#KMP_AFFINITY="granularity=fine ,compact"
+KMP_AFFINITY="granularity=fine ,compact"
 OMP_NUM_THREADS=3 mpirun -npernode 4 ./serial 1024
