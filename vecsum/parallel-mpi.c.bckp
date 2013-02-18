@@ -49,20 +49,28 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    double* v = (double*)calloc(n,sizeof(double));
+    double* v = (double*)malloc(n*sizeof(double));
     double sumn = 0;
+    /*double* sumn = (double*)malloc(size*sizeof(double));
+    for (int i = 0; i < size; i++){
+        sumn[i] = 0;
+    }*/
 
     time_init = walltime();
 
-    for (int i=n-(size-(rank+1))*n/size; i>rank*n/size; i--){
-	v[i-1] = (double)1.0/(i*i);
-        sumn += v[i-1];
-        printf("Rank: %i\tIndex: %i\tSumn: %f\n",rank,i-1,sumn);
+    for (int i=n-(size-(rank+1))*n/size; i>rank*n/size; i--){      
+	v[i] = (double)1.0/(i*i);
+        sumn += v[i];
+       // printf("Rank: %i\tIndex: %i\tSumn: %f\n",rank,i,sumn);
     }
-    double s2 = sumn;
+    double s2 = sumn; //What happens here?
     MPI_Allreduce(&s2, &sumn, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     if (rank == 0){
+        /*for (int i = 1; i < size; i++){
+            printf("sumn: %f\n",sumn[0]);
+            sumn[0] += sumn[i];
+        }*/
         printf("Error:\t\t%.52f\nTime Elapsed:\t%f\n",sum-sumn,walltime()-time_init);
     }
     MPI_Finalize();
