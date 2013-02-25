@@ -4,7 +4,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[english]{babel}
 \usepackage{graphicx,epic,curves}
-\usepackage{lmodern,latexsym,amssymb,amsmath,amsfonts,url,multirow,siunitx,cite}
+\usepackage{lmodern,latexsym,amssymb,amsmath,amsfonts,url,multirow,cite}
 \usepackage{color,fancyvrb,keyval,xcolor,float,ifthen,calc,ifplatform}
 \usepackage{minted}
 \usepackage{multicol}
@@ -28,12 +28,12 @@
 \date{\today}
 
 \begin{document}
-\newminted{c}{linenos=true,frame=leftline,bgcolor=Avocado_Peel}
-\usemintedstyle{monokai}
+\newminted{c}{linenos=true,frame=leftline} %bgcolor=Avocado_Peel
+\usemintedstyle{tango}
 
 \maketitle
 
-\section*{Serial}
+\section{Serial}
 
 \begin{ccode}
 int main(int argc, char** argv){
@@ -45,23 +45,26 @@ int main(int argc, char** argv){
         printf("Need one parameter, the size of the vector\n");
         return 1;
     }
-    long int n = atoi(argv[1]);
+    int n = atoi(argv[1]);
     printf("Serial:\n");
     double* v = (double*)malloc(n*sizeof(double));
     double sumn = 0;
     time_init = walltime();
 
     for(long int i=n; i>0; i--){
+        //Generate vector
         v[i] = 1.0/((double)i*i);
+        //Compute the sum
         sumn += v[i];
     }
-    printf("Error:\t\t%e \nTime Elapsed:\t%f\n",sum-sumn,walltime()-time_init);
+    //Compute and print S -S_n
+    printf("Error:\t\t %.16e\n",sum-sumn);
+    printf("Time Elapsed:\t %f\n",walltime()-time_init);
 	return 0;
 }
 \end{ccode}
 
-\section*{Parallel}
-\subsection*{OpenMP}
+\section{Parallel - OpenMP}
 \begin{ccode}
 int main(int argc, char** argv){
     double pi = 4.0*atan(1);
@@ -83,12 +86,13 @@ int main(int argc, char** argv){
         v[i] = 1.0/((double)i*i);
         sumn += v[i];
     }
-    printf("Error:\t\t%e \nTime Elapsed:\t%f\n",sum-sumn,walltime()-time_init);
+    printf("Error:\t\t %.16e\n",sum-sumn);
+    printf("Time Elapsed:\t %f\n",walltime()-time_init);
     return 0;
 }
 \end{ccode}
 
-\subsection*{MPI}
+\section{Parallel - MPI}
 \begin{ccode}
 int main(int argc, char** argv){
     int rank = 0,size = 1;
@@ -105,44 +109,110 @@ int main(int argc, char** argv){
             MPI_Finalize();
             return 1;
         }else if(!isPowerOfTwo(size)){
-            printf("The number of processors must be a power of 2");
+            printf("The number of processors must be a power of 2\n");
             MPI_Finalize();
             return 1;
         }
     }
-    int N = atoi(argv[1]), share = N/size;
+    int N = atoi(argv[1]), n = N/size;
     double sumn = 0.0;
-    double* v = (double*)calloc(share,sizeof(double));
+    double* v = (double*)calloc(n,sizeof(double));
     time_init = walltime();
 
-    for(int i=share; i>0; i--){
-        v[i-1] = 1.0/(((double)i+rank*share)*(i+rank*share));
-        sumn += v[i-1];
+    int offset = rank*n;
+    for(int i=n; i>0; i--){
+        v[i] = 1.0/(((double)i+offset)*(i+offset));
+        sumn += v[i];
     }
     double s2 = sumn;
     MPI_Reduce(&s2, &sumn, 1, MPI_DOUBLE, MPI_SUM, 0,MPI_COMM_WORLD);
 
     if(rank == 0){
-        printf("Error:\t\t%e \nTime Elapsed:\t%f \n",sum-sumn,walltime()-time_init);
+        printf("Error:\t\t %.16e\n",sum-sumn);
+        printf("Time Elapsed:\t %f\n",walltime()-time_init);
     }
     MPI_Finalize();
     return 0;
 }
 \end{ccode}
-%\begin{figure}[hbtp]
-%	\begin{minipage}[b]{0.45\linewidth}
-%			\centering
-%			\caption{Entropy}
-%			\includegraphics[width=\linewidth]{}
-%			\label{fig:12entropy}
-%	\end{minipage}
-%	\hspace{0.05\linewidth}
-%	\begin{minipage}[b]{0.45\linewidth}
-%			\centering
-%			\caption{Susceptibility}
-%			\includegraphics[width=\linewidth]{}
-%			\label{fig:12heatcap}
-%	\end{minipage}
-%\end{figure}
+
+\section{MPI-Calls}
+\textit{MPI\_Init()} and \textit{MPI\_Finalize()} are necessary to
+use. \textit{MPI\_Comm\_size()} and
+\textit{MPI\_Comm\_rank()} are very convenient to use. The
+communicator size could in principle be set constant inside the program, but
+this would limit the versatility of the program. It's possible to make do
+without finding the rank of each processor, but this would complicate the code
+quite a bit (if it is even possible to write this program without a call to
+\textit{MPI\_Comm\_rank()}. \textit{MPI\_Reduce()} is also a convenient call to
+use to sum up the partial sums stores on each processor. Alternatively calls to
+\textit{MPI\_Send()} and \textit{MPI\_Recv()} could have been used.
+    
+\section{Comparison}
+The difference $S-S_n$ should in general be the same each time the serial
+program is run. This is not the case for the parallel version as the resultant
+$S_n$ depends on the order in which the partial sums on each processor is added
+together. Doing multiple runs with the parallel program will give up to $P!$
+different sums, where $P$ is the number of threads used in the program.
+
+\section{Memory}
+When $n>>1$ the vector will dominate the memory. For the single processor
+program the vector will take up $n \cdot sizeof(double)$ of memory space. For
+the parallel-omp version of the program the vector will be copied for each
+processor, but for the parallel-mpi version the vector will be split up into
+equal chunks for each processor, so the memory requirement for each processor
+will be $n \cdot sizeof(double))/P$.
+
+\section{FLOPs}
+Looking at the line
+\begin{ccode*}{firstnumber=18}
+v[i] = 1.0/((double)i*i);
+\end{ccode*}
+we count 2 FLOPs, one division and one multiplication, for each element in $v$,
+so the total number of FLOPs required to generate $v$ of length $n$ is $2n$ for
+both the serial and openMP version of the program. For the generation of $v$ in
+the MPI version the line reads
+\begin{ccode*}{firstnumber=28}
+v[i] = 1.0/(((double)i+offset)*(i+offset));
+\end{ccode*}
+which contains 4 FLOPs, one division, two additions and one multiplication. The
+additions can however be avoided by altering the code, but this was not done as
+addition is asuumed a cheap operation.
+
+Given the elements in $v$, $n-1$ FLOPs are needed to summarize them in
+both serial and in parallel.
+
+\section{Parallell processing}
+The use of multiple local CPUs speed up the calculation almost linearly as a
+function of the number of cores, but on a network the limit factor will be the
+bandwith as relativley few FLOPs are needed to do each part of the calculation
+before sending the sum back. The use of more CPUs will also increase the error
+of the calculation, as there is less control of how the summing is done.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 \end{document}

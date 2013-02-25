@@ -30,6 +30,6 @@ int main(int argc, char** argv){
         v[i] = 1.0/((double)i*(double)i);
         sumn += v[i];
     }
-    printf("Error:\t\t%e \nTime Elapsed:\t%f\n",sum-sumn,walltime()-time_init);
+    printf("Error:\t\t%32.32e \nTime Elapsed:\t%f\n",sum-sumn,walltime()-time_init);
     return 0;
 }
