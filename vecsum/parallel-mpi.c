@@ -37,20 +37,21 @@ int main(int argc, char** argv){
             return 1;
         }
     }
-    int N = atoi(argv[1]), share = N/size;
+    int N = atoi(argv[1]), n = N/size;
     double sumn = 0.0;
-    double* v = (double*)calloc(share,sizeof(double));
+    double* v = (double*)calloc(n,sizeof(double));
     time_init = walltime();
 
-    for(int i=share; i>0; i--){
-        v[i-1] = 1.0/(((double)i+rank*share)*(i+rank*share));
-        sumn += v[i-1];
+    int offset = rank*n;
+    for(int i=n; i>0; i--){
+        v[i] = 1.0/(((double)i+offset)*(i+offset));
+        sumn += v[i];
     }
     double s2 = sumn;
     MPI_Reduce(&s2, &sumn, 1, MPI_DOUBLE, MPI_SUM, 0,MPI_COMM_WORLD);
 
     if(rank == 0){
-        printf("Error:\t\t%e \nTime Elapsed:\t%f \n",sum-sumn,walltime()-time_init);
+        printf("Error:\t\t%32.32e \nTime Elapsed:\t%f \n",sum-sumn,walltime()-time_init);
     }
     MPI_Finalize();
     return 0;
