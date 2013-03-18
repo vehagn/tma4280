@@ -60,8 +60,11 @@ int main(int argc, char **argv ){
   for (int i=0;i<M;++i)
     grid->data[i] = (i+1)*h;
 
-  Matrix u = createMatrix(M, M);
-  Matrix ut = createMatrix(M, M);
+  //Matrix u = createMatrixMPI(M, M, M, M, &SelfComm);
+  //Matrix ut = createMatrixMPI(M, M, M, M, &SelfComm);
+  Matrix u = createMatrix(M,M);
+  Matrix ut = createMatrix(M,M);
+
   evalMesh(u->as_vec, grid, grid, poisson_source);
   scaleVector(u->as_vec, h*h);
 
@@ -70,18 +73,26 @@ int main(int argc, char **argv ){
 
   double time = WallTime();
 
-  for (int j=0; j < M; j++)
+// Step 1) G = QtGQ = S⁻¹((S(G))t)
+printf("OpenMP\tThreadcount: %i\n",max_threads());
+  for (int j=0; j < M; j++){
     fst(u->data[j], &N, z->data, &NN);
+  }
 
   transposeMatrix(ut, u);
 
-  for (int i=0; i < M; i++)
+  for (int i=0; i < M; i++){
     fstinv(ut->data[i], &N, z->data, &NN);
+  }
 
-  for (int j=0; j < M; j++)
-    for (int i=0; i < M; i++)
+// Step 2) u_ij = g_ij / (l_i + l_j)
+#pragma omp parallel for schedule(static)
+  for (int j=0; j < M; j++){
+    for (int i=0; i < M; i++){
       ut->data[j][i] /= lambda->data[i]+lambda->data[j];
-
+    }
+  }
+// Step 3) U = QUQ^T = S⁻¹((S(Ut))t)
   for (int i=0; i < M; i++)
     fst(ut->data[i], &N, z->data, &NN);
 
