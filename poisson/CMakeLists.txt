@@ -60,8 +60,10 @@ MACRO(ADD_APP APP)
   SET(all-bin "${all-bin} ${APP}")
 ENDMACRO(ADD_APP)
 
-ADD_APP(poisson-diag-fst)
-ADD_APP(poisson2)
+#ADD_APP(poisson-diag-fst)
+#ADD_APP(poisson2)
+ADD_APP(poisson4)
+ADD_APP(poissonMPI)
 
 # For generating the doxy
 ADD_CUSTOM_TARGET(doc doxygen 

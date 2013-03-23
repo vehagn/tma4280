@@ -15,7 +15,6 @@ void fst(double *v, int *n, double *w, int *nn);
 void fstinv(double *v, int *n, double *w, int *nn);
 
 double findMax(Matrix u){
-
   double max = 0.0;
   for (int i=0; i < u->rows; i++) {
     for (int j=0; j < u->cols; j++) {
@@ -26,7 +25,6 @@ double findMax(Matrix u){
 }
 
 Vector createEigenValues(int m){
-
   Vector diag = createVector(m);
   for (int i=0; i < m; i++)
     diag->data[i] = 2.0*(1.0-cos((i+1)*M_PI/(m+1)));
@@ -60,10 +58,10 @@ int main(int argc, char **argv ){
   for (int i=0;i<M;++i)
     grid->data[i] = (i+1)*h;
 
-  //Matrix u = createMatrixMPI(M, M, M, M, &SelfComm);
-  //Matrix ut = createMatrixMPI(M, M, M, M, &SelfComm);
-  Matrix u = createMatrix(M,M);
-  Matrix ut = createMatrix(M,M);
+  Matrix u = createMatrixMPI(M, -1, M, M, &SelfComm);
+  Matrix ut = createMatrixMPI(-1, M, M, M, &SelfComm);
+  //Matrix u = createMatrix(M,M);
+  //Matrix ut = createMatrix(M,M);
 
   evalMesh(u->as_vec, grid, grid, poisson_source);
   scaleVector(u->as_vec, h*h);
