@@ -142,14 +142,18 @@ int main (int argc, char** argv){
             }
         }
     }
-    MPI_Allreduce(&umax, &umax, 0, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    double totTime = MPI_Wtime()-startTime;
+    double t = totTime;
+    MPI_Reduce(&t, &totTime, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Allreduce(&umax, &umax, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
     if (rank == 0){
-        printf("Processors:   %i*%i\n",size,threads);
-        printf("Jobsize:      %i/%i\n",local_m,m);
-        printf("Max pointwise error = %.14f \n", umax);
+        printf("Processors (nodes,threads):   %i*%i\n",size,threads);
+        printf("Jobsize:                      %i/%i\n",local_m,m);
+        printf("Average runtime:              %.8f s\n", totTime/size);
+        printf("Max pointwise error:          %.14f \n\n", umax);
     }
-    printf("r%i - %.4f s\t",rank, MPI_Wtime()-startTime);
+    //printf("r%i - %.4f s\t",rank, MPI_Wtime()-startTime);
 
     free(u.data);
     free(ut.data);
