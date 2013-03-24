@@ -61,9 +61,3 @@ MACRO(ADD_APP APP)
 ENDMACRO(ADD_APP)
 
 ADD_APP(poisson)
-ADD_APP(poissonMPI)
-
-# For generating the doxy
-ADD_CUSTOM_TARGET(doc doxygen 
-                  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-                  COMMENT "Generating API documentation" VERBATIM)

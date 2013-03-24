@@ -54,6 +54,7 @@ int main (int argc, char** argv){
     int threads = omp_get_max_threads();
 
     if (rank == 0){
+        printf("\n-------- N = %i --------\n", n);
         printf("Memory estimates:\n");
         printf(" Per node:  %lu MB\n", (2*n*n*sizeof(double)/size)>>20);
         printf(" Total:     %lu MB\n",    (2*n*n*sizeof(double))>>20);
