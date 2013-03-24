@@ -1,130 +1,256 @@
-/*
-  C-program to solve the two-dimensional Poisson equation on 
-  a unit square using one-dimensional eigenvalue decompositions
-  and fast sine transforms
-
-  einar m. ronquist
-  ntnu, october 2000
-  revised, october 2001
-*/
-
-#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <memory.h>
 #include <math.h>
+#include <memory.h>
+#include <mpi.h>
+#include <omp.h>
 
-typedef double Real;
+typedef struct{
+    int m;
+    int local_m;
+    double** data;
+    int comm_size;
+    int comm_rank;
+    int* sizes;
+    int* displ;
+    int* count;
+} Matrix;
 
-/* function prototypes */
-Real *createRealArray (int n);
-Real **createReal2DArray (int m, int n);
-void transpose (Real **bt, Real **b, int m);
-void fst_(Real *v, int *n, Real *w, int *nn);
-void fstinv_(Real *v, int *n, Real *w, int *nn);
+/* Function prototypes */
+double *createVector(int n);
+double **createMatrix(int m, int n);
+void freeMatrix(Matrix x);
+void fst_(double *v, int *n, double *w, int *nn);
+void fstinv_(double *v, int *n, double *w, int *nn);
+void transposeMPI(Matrix ut, Matrix u);
+double evalFunc(int i, int j, double h, int displ, double pi);
 
+int main (int argc, char** argv){
 
-main(int argc, char **argv )
-{
-  Real *diag, **b, **bt, *z;
-  Real pi, h, umax;
-  int i, j, n, m, nn;
-
-  /* the total number of grid points in each spatial direction is (n+1) */
-  /* the total number of degrees-of-freedom in each spatial direction is (n-1) */
-  /* this version requires n to be a power of 2 */
-
- if( argc < 2 ) {
-    printf("need a problem size\n");
-	return;
-  }
-
-  n  = atoi(argv[1]);
-  m  = n-1;
-  nn = 4*n;
-
-  diag = createRealArray (m);
-  b    = createReal2DArray (m,m);
-  bt   = createReal2DArray (m,m);
-  z    = createRealArray (nn);
-
-  h    = 1./(Real)n;
-  pi   = 4.*atan(1.);
-
-  for (i=0; i < m; i++) {
-    diag[i] = 2.*(1.-cos((i+1)*pi/(Real)n));
-  }
-  for (j=0; j < m; j++) {
-    for (i=0; i < m; i++) {
-      b[j][i] = h*h;
+    if (argc < 2) {
+        printf("Usage: %s <N> [L]\n",argv[0]);
+        return 1;
     }
-  }
-  for (j=0; j < m; j++) {
-    fst_(b[j], &n, z, &nn);
-  }
 
-  transpose (bt,b,m);
+    const double pi = 4.0*atan(1.0);
+    double *lambda, **z, *globalDispl;
+    Matrix u, ut;
+    int rank, size;
 
-  for (i=0; i < m; i++) {
-    fstinv_(bt[i], &n, z, &nn);
-  }
-  
-  for (j=0; j < m; j++) {
-    for (i=0; i < m; i++) {
-      bt[j][i] = bt[j][i]/(diag[i]+diag[j]);
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    int n = atoi(argv[1]);
+    int m = n-1;
+    int local_m = m/size;
+    int nn = 4*n;
+    double len = 1.0;
+    if (argc > 2)
+        len = atof(argv[2]);
+    double h = len/(double)n;
+    double hh = h*h;
+
+    int threads = omp_get_max_threads();
+
+    if (rank == 0){
+        printf("Memory estimates:\n");
+        printf(" Per node:  %lu MB\n", (2*n*n*sizeof(double)/size)>>20);
+        printf(" Total:     %lu MB\n",    (2*n*n*sizeof(double))>>20);
     }
-  }
-  
-  for (i=0; i < m; i++) {
-    fst_(bt[i], &n, z, &nn);
-  }
 
-  transpose (b,bt,m);
+    lambda = createVector(m);
+    globalDispl = createVector(size+1); //+1 for sleeker code
+    z = createMatrix(threads,nn);
 
-  for (j=0; j < m; j++) {
-    fstinv_(b[j], &n, z, &nn);
-  }
+    u.count = ut.count = calloc(size, sizeof(int));
+    u.sizes = ut.sizes = calloc(size, sizeof(int));
+    u.displ = ut.displ = calloc(size, sizeof(int));
+    u.m = ut.m = m;
+    u.comm_size = ut.comm_size = size;
+    u.comm_rank = ut.comm_rank = rank;
 
-  umax = 0.0;
-  for (j=0; j < m; j++) {
-    for (i=0; i < m; i++) {
-      if (b[j][i] > umax) umax = b[j][i];
+
+    //Calculate number of rows each processor should have.
+    for (int i = 0; i < size; i++){
+        u.sizes[i] = ut.sizes[i] = local_m;
+        if (i < m%local_m)
+            u.sizes[i] = ut.sizes[i] += 1;
+        globalDispl[i+1] = globalDispl[i] + u.sizes[i];
     }
-  }
-  printf (" umax = %e \n",umax);
+
+    //Calculate how many elts. to send/recv and processor displ.
+    int sum = 0;
+    for (int i = 0; i < size; i++){
+        u.count[i] = ut.count[i] = u.sizes[rank]*u.sizes[i];
+        u.displ[i] = ut.displ[i] = sum;
+        sum += u.count[i];
+    }
+
+    //Calculate local number of rows.
+    if ((local_m*size < m) && (rank < m%local_m))
+        local_m++;
+
+    u.data = createMatrix(local_m, m);
+    ut.data = createMatrix(local_m, m);
+
+    //Calculate eigenvalues.
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < m; i++){
+        lambda[i] = 2.0*(1.0-cos((i+1)*pi*h));
+    }
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < local_m; i++){
+        for (int j = 0; j < m; j++){
+            u.data[i][j] = hh*evalFunc(i, j, h, globalDispl[rank], pi);
+        }
+    }
+    double startTime = MPI_Wtime();
+
+    //Step 1) G = QtGQ = S⁻¹((S(G))t)
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < local_m; i++) {
+        fst_(u.data[i], &n, z[omp_get_thread_num()], &nn);
+    }
+    transposeMPI(ut,u);
+
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < local_m; i++){
+        fstinv_(ut.data[i], &n, z[omp_get_thread_num()], &nn);
+    }
+
+    //Step 2) u_ij = g_ij / (l_i + l_j)
+    #pragma omp parallel for schedule(static)
+    for (int i=0; i < local_m; i++){
+        for (int j=0; j < m; j++){
+            ut.data[i][j] /= (lambda[(int)globalDispl[rank]+i]+lambda[j]);
+        }
+    }
+
+    //Step 3) U = QUQ^T = S⁻¹((S(Ut))t)
+    #pragma omp parallel for schedule(static)
+    for (int i=0; i < local_m; i++){
+        fst_(ut.data[i], &n, z[omp_get_thread_num()], &nn);
+    }
+    transposeMPI(u, ut);
+
+    #pragma omp parallel for schedule(static)
+    for (int i=0; i < local_m; i++){
+        fstinv_(u.data[i], &n, z[omp_get_thread_num()], &nn);
+    }
+
+    double umax = 0.0, temp;
+    for (int i = 0; i < local_m; i++){
+        for (int j = 0; j < m; j++){
+            temp = u.data[i][j]-evalFunc(i, j, h, globalDispl[rank], pi)/(5.*pi*pi);
+            if (temp > umax){
+                umax = temp;
+            }
+        }
+    }
+    MPI_Allreduce(&umax, &umax, 0, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
+    printf("Rank: %i, Part: %i/%i, time: %.15f s\n", rank, local_m, m, MPI_Wtime()-startTime);
+    if (rank == 0)
+        printf ("Max pointwise error = %.14f \n", umax);
+
+    free(u.data);
+    free(ut.data);
+    free(lambda);
+    free(z);
+    free(globalDispl);
+
+    MPI_Finalize();
+    return 0;
 }
 
-void transpose (Real **bt, Real **b, int m)
-{
-  int i, j;
-  for (j=0; j < m; j++) {
-    for (i=0; i < m; i++) {
-      bt[j][i] = b[i][j];
-    }
-  }
+double *createVector (int n){
+	double *a;
+	int i;
+	a = (double*)malloc(n*sizeof(double));
+	for (i=0; i < n; i++) {
+		a[i] = 0.0;
+	}
+	return a;
 }
 
-Real *createRealArray (int n)
-{
-  Real *a;
-  int i;
-  a = (Real *)malloc(n*sizeof(Real));
-  for (i=0; i < n; i++) {
-    a[i] = 0.0;
-  }
-  return (a);
+double **createMatrix(int n1, int n2){
+	double **a;
+	a    = (double **)malloc(n1   *sizeof(double *));
+	a[0] = (double  *)malloc(n1*n2*sizeof(double));
+	for (int i=1; i < n1; i++) {
+		a[i] = a[i-1] + n2;
+	}
+	return (a);
 }
 
-Real **createReal2DArray (int n1, int n2)
-{
-  int i, n;
-  Real **a;
-  a    = (Real **)malloc(n1   *sizeof(Real *));
-  a[0] = (Real  *)malloc(n1*n2*sizeof(Real));
-  for (i=1; i < n1; i++) {
-    a[i] = a[i-1] + n2;
-  }
-  n = n1*n2;
-  memset(a[0],0,n*sizeof(Real));
-  return (a);
+double evalFunc(int i, int j, double h, int displ, double pi){
+    double x = (double)(j+1)*h;
+    double y = (double)(displ+i+1)*h;
+    //if (x > 0.6 && y > 0.6) return 10.;
+    //return exp(1.-x-y)-1.;
+    //return -(2.0-4*pi*pi*x*(x-1.0))*sin(2.0*pi*y);
+	return 5.0*pi*pi*sin(pi*x)*sin(2.0*pi*y);
+    //return 1.0;
+
 }
+
+void transposeMPI(Matrix ut, Matrix u){
+	int i,j,k;
+	int len = ut.displ[ut.comm_size-1]+ut.count[ut.comm_size-1];
+	double* temp = (double*)malloc(len*sizeof(double));
+	double* temp2 = (double*)malloc(len*sizeof(double));
+	int l = 0;
+	int count = 0;
+	for (i = 0; i < ut.comm_size; i++){
+		for (j = 0; j < ut.sizes[ut.comm_rank]; j++){
+			for (k = 0; k < ut.sizes[i]; k++){
+				temp[count++] = u.data[j][k+l];
+			}
+		}
+		l += ut.sizes[i];
+	}
+
+	MPI_Alltoallv(temp,u.count,u.displ,MPI_DOUBLE,temp2,ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
+	count = 0;
+	for (i = 0; i < ut.m; i++){
+		for (j = 0; j < ut.sizes[ut.comm_rank]; j++){
+			ut.data[j][i] = temp2[count++];
+		}
+	}
+	free(temp);
+	free(temp2);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

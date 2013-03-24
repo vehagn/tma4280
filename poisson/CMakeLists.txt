@@ -50,25 +50,20 @@ ENDIF(MPI_FOUND)
 INCLUDE_DIRECTORIES(${INCLUDES})
 
 # Add a library with common sources
-ADD_LIBRARY(common common.c fst.f)
+ADD_LIBRARY(fst fst.f)
 
 # Macro for recording targets
 MACRO(ADD_APP APP)
   ADD_EXECUTABLE(${APP} ${APP}.c)
-  TARGET_LINK_LIBRARIES(${APP} common ${DEPLIBS})
+  TARGET_LINK_LIBRARIES(${APP} fst ${DEPLIBS})
   SET_TARGET_PROPERTIES(${APP} PROPERTIES LINKER_LANGUAGE C)
   SET(all-bin "${all-bin} ${APP}")
 ENDMACRO(ADD_APP)
 
-#ADD_APP(poisson-diag-fst)
-#ADD_APP(poisson2)
-ADD_APP(poisson4)
+ADD_APP(poisson)
 ADD_APP(poissonMPI)
 
 # For generating the doxy
 ADD_CUSTOM_TARGET(doc doxygen 
                   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
                   COMMENT "Generating API documentation" VERBATIM)
-
-# Generate convenience script
-CONFIGURE_FILE(runall.sh.in runall.sh @ONLY)
