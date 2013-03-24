@@ -53,13 +53,6 @@ int main (int argc, char** argv){
 
     int threads = omp_get_max_threads();
 
-    if (rank == 0){
-        printf("\n-------- N = %i --------\n", n);
-        printf("Memory estimates:\n");
-        printf(" Per node:  %lu MB\n", (2*n*n*sizeof(double)/size)>>20);
-        printf(" Total:     %lu MB\n",    (2*n*n*sizeof(double))>>20);
-    }
-
     lambda = createVector(m);
     globalDispl = createVector(size+1); //+1 for sleeker code
     z = createMatrix(threads,nn);
@@ -151,20 +144,18 @@ int main (int argc, char** argv){
     }
     MPI_Allreduce(&umax, &umax, 0, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-    //printf("Rank: %i, Part: %i/%i, time: %.15f s\n", rank, local_m, m, MPI_Wtime()-startTime);
     if (rank == 0){
-        printf("Processors:   %i\n",size);
+        printf("Processors:   %i*%i\n",size,threads);
         printf("Jobsize:      %i/%i\n",local_m,m);
-        printf("Time elapsed: %.8f s\n",MPI_Wtime()-startTime);	
         printf("Max pointwise error = %.14f \n", umax);
     }
+    printf("r%i - %.4f s\t",rank, MPI_Wtime()-startTime);
 
     free(u.data);
     free(ut.data);
     free(lambda);
     free(z);
     free(globalDispl);
-
     MPI_Finalize();
     return 0;
 }
