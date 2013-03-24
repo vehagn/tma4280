@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -N test
+#PBS -lnodes=4:ppn=12:default
+#PBS -lwalltime=00:10:00
+#PBS -lpmem=2000MB
+#PBS -A freecycle
+#PBS -q optimist
+#PBS -j oe
+
+cd ${PBS_O_WORKDIR}
+
+module load intelcomp
+module load openmpi/1.4.3-intel
+KMP_AFFINITY="granularity=fine ,compact"
+OMP_NUM_THREADS=8
+for n in 32 64 256 512 2048 4096 16384
+do
+	mpirun -np 1 ./poisson $n
+	mpirun -np 4 ./poisson $n
+	mpirun -np 16 ./poisson $n
+	mpirun -np 32 ./poisson $n
+done
