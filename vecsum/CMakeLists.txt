@@ -6,6 +6,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
 # We use the C language
 ENABLE_LANGUAGE(C)
+ENABLE_LANGUAGE(Fortran)
 
 # We want C99
 INCLUDE(CheckCCompilerFlag)
