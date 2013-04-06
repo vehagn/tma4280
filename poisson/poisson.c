@@ -196,15 +196,14 @@ double evalFunc(int i, int j, double h, int displ, double pi){
 }
 
 void transposeMPI(Matrix ut, Matrix u){
-	int i,j,k;
 	int len = ut.displ[ut.comm_size-1]+ut.count[ut.comm_size-1];
 	double* temp = (double*)malloc(len*sizeof(double));
 	double* temp2 = (double*)malloc(len*sizeof(double));
 	int l = 0;
 	int count = 0;
-	for (i = 0; i < ut.comm_size; i++){
-		for (j = 0; j < ut.sizes[ut.comm_rank]; j++){
-			for (k = 0; k < ut.sizes[i]; k++){
+	for (int i = 0; i < ut.comm_size; i++){
+		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
+			for (int k = 0; k < ut.sizes[i]; k++){
 				temp[count++] = u.data[j][k+l];
 			}
 		}
@@ -213,8 +212,8 @@ void transposeMPI(Matrix ut, Matrix u){
 
 	MPI_Alltoallv(temp,u.count,u.displ,MPI_DOUBLE,temp2,ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
 	count = 0;
-	for (i = 0; i < ut.m; i++){
-		for (j = 0; j < ut.sizes[ut.comm_rank]; j++){
+	for (int i = 0; i < ut.m; i++){
+		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
 			ut.data[j][i] = temp2[count++];
 		}
 	}
