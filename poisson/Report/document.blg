@@ -1,0 +1,58 @@
+This is BibTeX, Version 0.99d (TeX Live 2012/Debian)
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: document.aux
+A level-1 auxiliary file: graphs/frontpage.aux
+A level-1 auxiliary file: graphs/error.aux
+A level-1 auxiliary file: graphs/time1.aux
+A level-1 auxiliary file: graphs/timing_single_node.aux
+A level-1 auxiliary file: graphs/timing_MPI.aux
+A level-1 auxiliary file: graphs/peff.aux
+A level-1 auxiliary file: graphs/solution1.aux
+A level-1 auxiliary file: graphs/solution2.aux
+A level-1 auxiliary file: graphs/solution4.aux
+The style file: plain.bst
+Database file #1: aref.bib
+Warning--entry type for "kongull" isn't style-file defined
+--line 1 of file aref.bib
+You've used 2 entries,
+            2118 wiz_defined-function locations,
+            515 strings with 4362 characters,
+and the built_in function-call counts, 427 in all, are:
+= -- 37
+> -- 14
+< -- 0
++ -- 6
+- -- 4
+* -- 16
+:= -- 76
+add.period$ -- 5
+call.type$ -- 2
+change.case$ -- 8
+chr.to.int$ -- 0
+cite$ -- 2
+duplicate$ -- 14
+empty$ -- 45
+format.name$ -- 4
+if$ -- 90
+int.to.chr$ -- 0
+int.to.str$ -- 2
+missing$ -- 0
+newline$ -- 12
+num.names$ -- 4
+pop$ -- 17
+preamble$ -- 1
+purify$ -- 6
+quote$ -- 0
+skip$ -- 15
+stack$ -- 0
+substring$ -- 10
+swap$ -- 2
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 8
+warning$ -- 0
+while$ -- 4
+width$ -- 3
+write$ -- 20
+(There was 1 warning)

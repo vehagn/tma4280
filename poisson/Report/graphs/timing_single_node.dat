@@ -1,0 +1,10 @@
+#Single node timing results
+#P	speedup	parallel efficency
+1	1	1
+2	1.90	0.95
+3	2.73	0.91
+4	3.49	0.87
+6	4.80	0.80
+8	5.96	0.75
+10	6.90	0.69
+12	7.84	0.65

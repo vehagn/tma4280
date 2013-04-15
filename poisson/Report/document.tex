@@ -1,0 +1,600 @@
+\documentclass[11pt,a4paper,english]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{graphicx,epic,curves}
+\usepackage{lmodern,latexsym,amssymb,amsmath,amsfonts,url,multirow,cite,hyperref}
+\usepackage{color,fancyvrb,keyval,xcolor,float,ifthen,calc,ifplatform}
+\usepackage{minted}
+\usepackage{multicol}
+\usepackage{tikz}
+\usepackage{gnuplot-lua-tikz}
+\usetikzlibrary{arrows}
+
+% Noen nye, nyttige kommandoer:
+\newcommand{\xunit}{\,\hat{\bf i}\,}
+\newcommand{\yunit}{\,\hat{\bf j}\,}
+\newcommand{\zunit}{\,\hat{\bf k}\,}
+\newcommand{\runit}{\,\hat{\bf r}\,}
+\newcommand{\nunit}{\,\hat{\bf n}\,}
+\newcommand{\rmd}{{\rm d}}
+\newcommand{\half}{\frac{1}{2}}
+\newcommand{\quart}{\frac{1}{4}}
+\newcommand{\degC}{^\circ \textrm{C}}
+\newcommand{\water}{\textrm{H}_2\textrm{O}}
+
+\numberwithin{figure}{subsection}
+\numberwithin{table}{subsection}
+
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=black,
+    urlcolor=black
+}
+\usepackage{pgfplots}
+\usepgfplotslibrary{external} 
+\tikzexternalize
+
+\title{TMA4280 - Introduction to supercomputing\\Exercise 6}
+\author{Vegard Stenhjem Hagen}
+\date{\today}
+
+\begin{document}
+\newminted{c}{linenos=true,frame=leftline}
+\usemintedstyle{tango}
+
+\maketitle
+
+\abstract
+In this report the poisson problem is briefly discussed and a strategy for
+directly solving it numerically on a supercomputer using OpenMP and MPI is
+presented. The numerical solution is tested for convergence using a readily
+analytical solvable problem and timed using different combinations MPI-processes and OpenMP threads on the high performance computer \textit{kongull}.
+\begin{figure}[hb]
+	\centering
+	\bigskip \bigskip \bigskip
+	\bigskip \bigskip \bigskip
+	\include{graphs/frontpage}
+\end{figure}
+	
+
+\newpage
+\tableofcontents
+\newpage
+\section{The 2D Poisson problem}
+\subsection{Introduction}
+The poisson equation on a domain $\Omega$ is given as 
+\begin{equation}
+	\begin{aligned}
+	-\Delta u & = f \\
+	u & = 0 \qquad \textrm{on} \ \partial \Omega
+	\end{aligned}
+	\label{eq:poisson}
+\end{equation}
+where $f$ is known, and $u$ is unknown. In this report the main focus will be
+on solving \eqref{eq:poisson} on the domain $\Omega = (0,1)\times(0,1)$. The
+problem is discretized on a regular finite difference grid with $n-1$ points in
+each spatial direction and spacing $h$ between each point. The standard 5-point stencil is used to discretize the Laplace operator $\Delta = \frac{\partial^2}{\partial x^2} + \frac{\partial^2}{\partial y^2}$ (fig.\ref{fig:grid}). This yields a roundoff error of $\mathcal{O}(h^2)$. Using the common notation that $u_{i,j} = u(x_i,y_j)$, where $i,j\in \mathbb{Z}^+$ is the discrete coordinates of a point on the grid, equation \eqref{eq:poisson} can be written as 
+\begin{equation}
+	\label{eq:discLap}
+	-\frac{u_{i+1,j}-2u_{i,j}+u_{i-1,j}}{h^2}-\frac{u_{i,j+1}-2u_{i,j}+u_{i,j-1}}{h^2} = f_{i,j}
+\end{equation}
+
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+	\draw [step=1,gray] (0,0) grid (4,4);
+	\draw [->](-0.3,0) -- (5,0) node [below] {$x$};
+	\draw [->](0,-0.3) -- (0,5) node [left] {$y$};
+	\draw (0,2) node[left] {$n$} (2,0) node[below] {$n$};
+	\draw [red,thick,fill=white] (2,2) circle (0.4) node[black] {$+4$};
+	\draw [blue,thick,fill=white](1,2) circle (0.4) node[black] {$-1$};
+	\draw [blue,thick,fill=white](3,2) circle (0.4) node[black] {$-1$};
+	\draw [blue,thick,fill=white](2,1) circle (0.4) node[black] {$-1$};
+	\draw [blue,thick,fill=white](2,3) circle (0.4) node[black] {$-1$};
+\end{tikzpicture}
+\label{fig:grid}
+\caption{Illustration of the 5-point stencil on an $n\times n$ grid}
+\end{figure}
+
+\subsection{Diagonalization}
+Let 
+\begin{equation}
+	U = \begin{pmatrix}
+	u_{1,1} & \cdots & u_{1,n-1} \\
+	\vdots & \ddots& \vdots \\
+	u_{n-1,1} & \cdots & u_{n-1,n-1}
+	\end{pmatrix}
+\end{equation}
+and
+\begin{equation}
+	\label{eq:Tmatrix}
+	T = \begin{pmatrix}
+	2		&	-1		&	0		&	\cdots	&	0		\\
+	-1		&	2		&	-1		&			&	\vdots	\\
+	0		&			&	\ddots	&			&	0		\\
+	\vdots	&			&		-1	&	2		&	-1		\\
+	0		&	\cdots	&	0		&	-1		&	2	
+	\end{pmatrix}
+\end{equation}
+Then
+\begin{equation}
+	(TU)_{i,j} = \begin{cases}  2u_{i,j} - u_{i+1,j} & i = 1, \\
+	-u_{i-1,j} + 2u_{i,j} - u_{i+1,j}  & 2 \leq i \leq n-2, \\
+	-u_{i-1,j} + 2u_{i,j}  & i = n-1.
+	\end{cases}
+\end{equation}
+thus equation \eqref{eq:discLap} can be expressed as
+\[
+	\frac{1}{h^2}(TU+UT)_{i,j} = f_{i,j} \quad \text{for} \quad 1\leq i,j \leq n-1,
+\]
+or more compact as
+\begin{equation}
+	\label{eq:TUUTG}
+	TU+UT = G,
+\end{equation}
+where
+\begin{equation*}
+	G = h^2\begin{pmatrix}
+	f_{1,1} 	& \cdots	& f_{1,n-1} \\
+	\vdots		& \ddots	& \vdots \\
+	f_{n-1,1}	& \cdots	& f_{n-1,n-1}
+	\end{pmatrix}
+\end{equation*}
+
+Since $T$ is a symmetric matrix it can be diagonalized, this means that it can be written on the form
+\begin{equation}
+	\label{eq:TQLQ}
+	T = Q\Lambda Q^T,
+\end{equation}
+where $Q=[q_1|q_2|\dots|q_{n-1}]$ is an orthonormal matrix containing the normalized eigenvectors $q_i$, $1\leq i \leq n-1$ of $T$ and $\Lambda$ is a matrix containing the corresponding eigenvalues $\lambda_i$ along its diagonal.
+
+Combining equations \eqref{eq:TUUTG} and \eqref{eq:TQLQ} and multiplying with $Q^T$ from the right and with $Q$ from the left results in
+\begin{equation}
+	\Lambda \underbrace{Q^TUQ}_{\widetilde{U}} + \underbrace{Q^TUQ}_{\widetilde{U}}\Lambda = \underbrace{Q^TGQ}_{\widetilde{G}}.
+\end{equation}
+
+Hence, \eqref{eq:TUUTG} may be solved in three steps:
+\begin{enumerate}
+	\item[\textbf{Step 1)}]	Compute 
+		\begin{align*}
+			\widetilde{G} &= Q^TGQ &\mathcal{O}(n^3) \quad\text{operations}
+		\end{align*}
+	\item[\textbf{Step 2)}]	Solve 
+		\begin{equation*}
+			\Lambda\widetilde{U}+\widetilde{U}\Lambda = \widetilde{G}
+		\end{equation*}
+							for $\widetilde{U}$, which boils down to solving 
+		\begin{align*}
+			\widetilde{u}_{i,j} &= \frac{\widetilde{g}_{i,j}}{\lambda_i + \lambda_j} &\mathcal{O}(n^2) \quad\text{operations}
+		\end{align*}
+	\item[\textbf{Step 3)}]	Compute 
+		\begin{align*}
+			U &= Q\widetilde{U}Q^T &\mathcal{O}(n^3) \quad\text{operations}
+		\end{align*}			
+\end{enumerate}
+Here $\widetilde{G},G,Q,T,\Lambda,\widetilde{U}$ and $U$ are all $(n-1)\times(n-1)$ real matrices.
+
+\subsection{Eigenvalues and eigenvectors}
+Define the vectors $\widetilde{q}_i$ as
+\begin{equation}
+	\label{eq:eigvec}
+	(\widetilde{q}_j)_i = \sin\left(\frac{ij\pi}{n}\right)
+\end{equation}
+and observe that $T$ as defined in \eqref{eq:Tmatrix} operated on $(\widetilde{q}_j)_i$ gives
+\begin{equation}
+	(T\widetilde{q}_j)_i = \underbrace{2\left(1-\cos\left(\frac{j\pi}{n}\right)\right)}_{\lambda_j}\underbrace{\sin\left(\frac{ij\pi}{n}\right)}_{(\widetilde{q}_j)_i}.
+\end{equation}
+Thus the vectors $\widetilde{q}_i$ defined in \eqref{eq:eigvec} are eigenvectors for the matrix $T$ with corresponding eigenvalues $\lambda_j$.
+
+Normalized eigenvectors $q_i$ can be represented as 
+\begin{equation}
+	\label{eq:normeigvec}
+	(q_j)_i = \sqrt{\frac{2}{n}}\sin\left(\frac{ij\pi}{n}\right).
+\end{equation} 
+Using these vectors as columns in a matrix yields the requsted orthonormal matrix $Q$ in equation \eqref{eq:TQLQ}. Also note that
+\begin{equation}
+	\label{eq:Q}
+	Q = Q^T = Q^{-1}
+\end{equation}
+	
+
+\subsection{Discrete Sine transform}
+The discrete sine transform (DST) of a vector $v=[v_1,v_2,\dots,v_{n-1}]$ is defined as
+\begin{equation}
+	\label{eq:DST}
+	\tilde{v}_j = \sum_{i=1}^{n-1}v_i\sin\left(\frac{ij\pi}{n}\right), \qquad j \in \{1,2,\dots,n\},
+\end{equation}
+this can be expressed as 
+\begin{equation}
+	\label{eq:DSTfunc}
+	\tilde{v} = S(v)
+\end{equation}
+	
+while the inverse discrete sine transform of $\tilde{v}$ can be expressed as
+\begin{equation}
+	\label{eq:DSTfunciv}
+	v = S^{-1}(\tilde{v}).
+\end{equation}
+	
+$S$ and $S^{-1}$ are related as
+\[
+	S = \frac{2}{n}S^{-1}
+\]
+Observe that the matrix $Q$ is a scaled version of the DST:
+\begin{equation}
+	\label{eq:QS}
+	Q = \sqrt{\frac{n}{2}}S = \sqrt{\frac{2}{n}}S^{-1}
+\end{equation}
+By utilising the Fast Fourier Transform, equation \eqref{eq:DSTfunc} and \eqref{eq:DSTfunciv} can be solved in $\mathcal{O}(n\log n)$ instead of $\mathcal{O}(n^2)$ as by conventional matrix vector multiplication.
+
+Considering step 1 computing $\widetilde{G} = Q^TGQ$, taking the transpose and using the properties stated in \eqref{eq:Q}, this can be rewritten as
+\begin{align*}
+	\widetilde{G}^T	&= Q^TG^TQ \\
+					&= Q(QG)^T.
+\end{align*}
+Using \eqref{eq:QS} this can further be rewritten to
+\begin{equation}
+	\widetilde{G}^T = \sqrt{\frac{2}{n}}S^{-1}\left(\left(\sqrt{\frac{n}{2}}S(G)\right)^T\right) = S^{-1}\left(\left(S(G)\right)^T\right).
+\end{equation}
+In a similar fashion, step 3 can be rewritten as
+\begin{align*}
+	U	&= Q\widetilde{U}Q^T \\
+		&= Q(Q\widetilde{U}^T)^T \\
+		&= S^{-1}\left((S(\widetilde{U}^T))^T\right)
+\end{align*}
+
+\newpage
+\section{Implementation}
+\subsection{Overview}
+The new solution strategy can then be summarized as follows
+\begin{enumerate}
+	\item[\textbf{Step 1)}] Compute
+		\begin{align*}
+		\widetilde{G}^T &=S^{-1}\left(\left(S(G)\right)^T\right)	&\mathcal{O}(n^2\log n) \quad\text{operations}
+		\end{align*}
+	\item[\textbf{Step 2)}]	Solve 
+		\begin{align*}
+			\widetilde{u}_{j,i} &= \frac{\widetilde{g}_{j,i}}{\lambda_j + \lambda_i} &\mathcal{O}(n^2) \quad\text{operations}
+		\end{align*}
+	\item[\textbf{Step 3)}] Compute
+		\begin{align*}
+			U &= S^{-1}\left((S(\widetilde{U}^T))^T\right)	&\mathcal{O}(n^2\log n) \quad\text{operations}
+		\end{align*}
+\end{enumerate}
+which is then implemented in C using a black-box fortran script for the DST. 
+
+The OpenMP and MPI libraries are used to help parallelize the code for use on a supercomputer. The program architecture (fig. \ref{fig:architecture}) is constructed to be load balanced where each MPI-process gets a share of the problem to solve. The shares may be slightly uneven distributed depening on if the problem size is divisible by the amount of MPI-processes or not, e.g. a problem size of $n=512$ ($511^2$ grid points) divded among three MPI-processes results in one processor getting $171$ columns, while the other two get $170$ columns. This is only a difference of $0.6\%$ of the total elements and therefore neglible. The OpenMP threads spawned by each MPI-process is done by calls to the \textit{\#pragma} compiler directives.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[node distance=1.5cm,>=stealth',bend angle=15,auto]
+	\tikzstyle{node} = [rectangle,thick,draw=red!75,minimum size=1cm]
+	\tikzstyle{proc} = [circle,thick,draw=blue!75,minimum size=0.5cm]
+	\draw [step=.5] (-3.5,-1.5) grid (0,2);
+	\draw (-3.5,0.25) node [left] {$n-1$} (-1.75,2) node [above] {$n-1$};
+	\draw [red] (-3.4,1.1) rectangle (-0.1,1.9);
+		\draw [->] (0.1,1.5) -- (0.6,1.5) node [right] {0};
+	\draw [red] (-3.4,0.1) rectangle (-0.1,0.9);
+		\draw [->] (0.1,0.5) -- (0.6,0.5) node [right] {1};
+	\draw [red] (-3.4,-0.9) rectangle (-0.1,-0.1);
+		\draw [->] (0.1,-0.5) -- (0.6,-0.5) node [right] {2};
+	\draw [red] (-3.4,-1.4) rectangle (-0.1,-1.1);
+		\draw [->] (0.1,-1.25) -- (0.6,-1.25) node [right] {3};
+	\draw (3,1.5) node (a) [node] {MPI-proc 0};
+		\node [proc] [above left of=a] {} edge [<-,bend left] (a);
+		\node [proc] [above right of=a] {} edge [<-,bend right] (a);
+		\node [proc] [above of=a] {} edge [<-] (a);
+	\draw (6,1.5) node (b) [node] {MPI-proc 1};
+		\node [proc] [above left of=b] {} edge [<-,bend left] (b);
+		\node [proc] [above right of=b] {} edge [<-,bend right] (b);
+		\node [proc] [above of=b] {} edge [<-] (b);
+	\draw (3,-1.5) node (c) [node] {MPI-proc 2};
+		\node [proc] [below left of=c] {} edge [<-,bend right] (c);
+		\node [proc] [below right of=c] {} edge [<-,bend left] (c);
+		\node [proc] [below of=c] {} edge [<-] (c);
+	\draw (6,-1.5) node (d) [node] {MPI-proc 3};
+		\node [proc] [below left of=d] {} edge [<-,bend right] (d);
+		\node [proc] [below right of=d] {} edge [<-,bend left] (d);
+		\node [proc] [below of=d] {} edge [<-] (d);
+	\path [<->] (a) edge (b) edge (c) edge (d);
+	\path [<->] (c) edge (d) edge (b);
+	\path [<->] (b) edge (d);
+\end{tikzpicture}
+\label{fig:architecture}
+\caption{Illustration of the program architecture. The left shows how the grid is split up among the MPI-processes, notice that there's an uneven distribution since $7^2$ is not divisible by $4$. The right figure shows how each MPI-process spawns three thread of its own and that each MPI-process communicates with all the other MPI-processes. The number of threads spawned by each MPI-process is arbitrary.}
+\end{figure}
+
+\subsubsection{Transpose}
+In order to perform the transpose operation all the MPI-processes need to communicate with each other, in order to simplify this procedure every MPI-process keep track of who owns which rows and what their displacements are so as to know where to send its data once the transpose operations is called upon. This is accomplished by using the command \textit{MPI\_Alltoallv} and packing and unpacking the buffer correctly. A schematical layout of how this is done can be viewed in figure \ref{fig:transpose}.
+
+The C code listing for the transpose can be found in the appendix.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[>=stealth']
+	\draw [step=1] (0,0) grid (5,5);
+	\draw [red] (0.1,3.1) rectangle (4.9,4.9);
+	\draw [blue] (0.1,1.1) rectangle (4.9,2.9);
+	\draw [green] (0.1,0.1) rectangle (4.9,0.9);
+		\path [red,->] (0.2,4.5) edge (1.8,4.5) node [below right] {0};
+		\path [red,->] (0.2,3.5) edge (1.8,3.5) node [below right] {1};
+		\path [blue,->] (2.2,4.5) edge (3.8,4.5) node [below right] {0};
+		\path [blue,->] (2.2,3.5) edge (3.8,3.5) node [below right] {1};
+		\path [green,->] (4.2,4.5) edge (4.8,4.5) node [below right] {0};
+		\path [green,->] (4.2,3.5) edge (4.8,3.5) node [below right] {1};
+		\path [->] (1,-0.2) edge (1,-0.8) node [below right] {Pack send buffer};
+	\draw (0.5,-2) rectangle (10.5,-1);
+		\path [red,->] (0.7,-1.5) edge (2.3,-1.5) node [above right] {0};
+		\path [red,->] (2.7,-1.5) edge (4.3,-1.5) node [above right] {1};
+		\path [blue,->] (4.7,-1.5) edge (6.3,-1.5) node [above right] {0};
+		\path [blue,->] (6.7,-1.5) edge (8.3,-1.5) node [above right] {1};	
+		\path [green,->] (8.7,-1.5) edge (9.3,-1.5) node [above right] {0};
+		\path [green,->] (9.7,-1.5) edge (10.3,-1.5) node [above right] {1};
+	\draw [step=1] (6,0) grid (11,5);
+	\draw [red] (6.1,3.1) rectangle (10.9,4.9);
+	\draw [blue] (6.1,1.1) rectangle (10.9,2.9);
+	\draw [green] (6.1,0.1) rectangle (10.9,0.9);
+		\path [->] (10,-0.8) edge (10,-0.2) node [above left] {Unpack recieve buffer};
+		\path [red,->] (6.5,4.8) edge (6.5,3.2) node [below right] {0};
+		\path [red,->] (7.5,4.8) edge (7.5,3.2) node [below right] {1};
+		\path [blue,->] (6.5,2.8) edge (6.5,1.2) node [below right] {0};
+		\path [blue,->] (7.5,2.8) edge (7.5,1.2) node [below right] {1};
+		\path [green,->] (6.5,0.8) edge (6.5,0.2) node [below right] {0};
+		\path [green,->] (7.5,0.8) edge (7.5,0.2) node [below right] {1};
+	\path (5.5,-2) edge (6,-2) node [below] {MPI\_Alltoallv};	
+\end{tikzpicture}
+\label{fig:transpose}
+\caption{A schematical layout of how the transpose operation is carried out over the MPI-processes.}
+\end{figure}
+
+\newpage
+\section{Numerical results and performance analysis}
+\subsection{Hardware}
+All the numerical results are obtained by running the program on the high performance computer \textit{kongull}. 
+
+Kongull consist of 93 compute nodes, of which 44 nodes have 48 GiB each, while the other 49 nodes have 24 GiB of memory. Each node consists of a HP DL165 G6 server with 2 6-core 2.4 GHz AMD Opteron 2431 (Istanbul) processors, with 6 512 KiB L1 cache and a common 6 MiB L3-cache. The difference in memory is of low concern for this report as the program will not exceed 5 GiB memory on a single node. Assuming a problem size of $n=16384=2^{14}$ the memory requirements for storing the matrix is $8\text{ Bytes}\cdot (2^{14})^2 = 2^{31} \text{ Bytes} = 2 \text{ GiB}$. While doing the transpose the memory requirement can double as the send buffer is constructed. The other variables stored are neglible compared to this as they have memory requirements of at most $\mathcal{O}(n)$, an upper estimate for the other variables of 1 GiB is therefore more than sufficient.
+
+The internal network of the kongull cluster is based on a fat tree layout, with slower connections towards the \textit{leaves} of the connection tree. Each login- and I/O-node is connected to a central switch, HP ProCurve 6600-24XG, with 10GbE SPF+ connectors. Two rack switches, ProCurve 2910al-48G are connected to the central switch with 10GbE SPF+ connectors. Each compute node is connected to a rack switch with 1Gb Ethernet network connection to the outside world, via two SR tranceivers on the central switch.\cite{kongull}
+Network latency is expected to be a bottleneck for the solver.
+
+The program was compiled using the intel compiler version 11.1.059 and a cmake script with the option \textit{-DCMAKE\_BUILD\_TYPE=Release}
+
+\subsection{Numerical results}
+The numerical tests were performed on \textit{kongull} using different amount of nodes ($N$), MPI-processes per node ($M$) and threads per MPI-process ($T_M$) which gives a total of $P=N\times M\times T_M$ processors used. The seed function used was
+\begin{equation*}
+	f(x,y) = 5\pi^2\cdot\sin(\pi x)\cdot\sin(2\pi y)
+\end{equation*}
+which has the analytical solution
+\begin{equation*}
+	u(x,y) = \sin(\pi x)\cdot\sin(2\pi y)
+\end{equation*}
+for the poisson equation (eq. \eqref{eq:poisson}). This makes it possible to check for convergence issues by comparing the numerical results to the analytical solution. A series of preliminary test runs with different combinations of nodes and MPI-processes per node were made on kongull, some of the results are summarized in table \ref{tab:errorresults}. 
+
+\begin{table}[hb]
+\caption{Select runs of two different combinations of nodes ($N$), MPI-processes per node ($M$) and threads per MPI-process ($T_M$) for different problem sizes $n$. }
+\centering
+	\begin{tabular}{r||c|c|c||c|c|c}
+\multicolumn{1}{c}{}& \multicolumn{3}{c||}{$N=1$, $M=1$, $T_M=6$, $P=6$}&\multicolumn{3}{c}{$N=3$, $M=2$, $T_M=6$, $P=36$} \\
+\hline
+$n$ & Error & $\tau$ [s]& ${\tau}/{n^2\log(n)}$ [s]& Error & $\tau$ [s]& ${\tau}/{n^2\log(n)}$ [s]\\ 
+\hline
+32		& $2.73\cdot10^{-3}$ & $3.59\cdot10^{-4}$ & $7.01\cdot10^{-8}$ & $2.73\cdot10^{-3}$ 	& $4.42\cdot10^{-2}$	&  $8.64\cdot10^{-6}$\\ 
+
+256		& $4.27\cdot10^{-5}$ & $2.26\cdot10^{-2}$ & $4.31\cdot10^{-8} $ & $4.27\cdot10^{-5}$ 	& $2.87\cdot10^{-2}$	&  $5.47\cdot10^{-8}$\\ 
+
+2048	& $6.67\cdot10^{-7}$ & $2.00\cdot10^{+0} $ & $4.33\cdot10^{-8} $ & $6.67\cdot10^{-7}$	& $6.39\cdot10^{-1} $	&  $1.39\cdot10^{-8}$\\ 
+
+16384	& $8.89\cdot10^{-9}$ & $1.64\cdot10^{+2} $ & $4.36\cdot10^{-8} $ & $8.89\cdot10^{-9}$	& $3.67\cdot10^{+1}$	&  $9.77\cdot10^{-9}$\\ 
+	\end{tabular} 
+	\label{tab:errorresults}
+\end{table}
+
+\subsubsection{Verification of correctness}
+A plot of the error as a function of problem size (fig. \ref{fig:error}) shows that the error decreases proprotional to $n^{-2}$, which is consistent with the error decreasing as $\mathcal{O}(h^2)$ since $h$ is inversely proportional to $n$. It can therefore be concluded that there are no convergence issues with the solver.
+
+\begin{figure}[tbp]
+	\centering
+	\include{graphs/error}
+	\caption{Pointwise error as a function of grid size for two different processor configurations. Notice that the pointwise error for both configurations is proportional to $n^{-2}$ which indicates that there are no convergence issues since the algorithm predicts convergence on the order of $\mathcal{O}(h^2)$ and $h$ is inversely proportional to $n$ in this case.}
+	\label{fig:error}
+\end{figure}
+
+\subsubsection{Timing}
+
+It is expected that the runtime $\tau$ per $n^2\log n$ for large values of $n$ will approach a constant value as the program is estimated to run in $\mathcal{O}(n^2\log n)$ time. By looking at figure \ref{fig:time1} this appears to be the case. Also note that the addition of more processors actually increases the average time spent calculating each element for small values of $n$, this is due to the increased overhead when using more processors.
+
+\begin{figure}[tbp]
+	\centering
+	\include{graphs/time1}
+	\caption{Total runtime $\tau$ divided by $n^2\log n$ as a function of $n$. Observe that the runtime per $n^2\log n$ appear to converge to a constant for large $n$ which is a strong indicator that the program runs in $\mathcal{O}(n^2 \log n)$ time. The increased value of $\tau /n^2\log n$ for $P=36$ for small $n$ is due to increased overhead and network latency when having to communicate between more nodes. This overhead is however neglible when the problem size increases.}
+		\label{fig:time1}
+\end{figure}
+
+\subsubsection{Speedup and parallel efficency}
+The speedup $S_P$ of an algorithm run on more processors is defined as the time it takes to run on one processor $\tau_1$ divided by the time it takes to run on $P$ processors $\tau_p$,
+\begin{equation}
+	S_P = \frac{\tau_1}{\tau_P}.
+\end{equation}
+The ideal speedup of an algorithm is directly proportional to the number of processors it is run on. Because of increased overhead when utilizing several processors ideal speedup is not obtainable. A measure of parallel efficency $\eta_P$ is defined as
+\begin{equation}
+	\eta_P = \frac{S_P}{P}
+\end{equation}
+which generally decreases as $P$ is increased because of the extra overhead and network latency.
+
+A simple numerical analysis of the speedup and parallel efficency done on a single node on Kongull using only one MPI-process is summarized in table \ref{tab:nodespeedup}. A plot of the table can be found in figure \ref{fig:nodespeed}. Notice that $\eta_P$ and $S_P$ decreases as $P$ increases  
+\begin{table}[htbp]
+	\label{tab:nodespeedup}
+	\caption{Timing results on a single node ($N=1$) using one MPI-process ($M=1$) and different amounts of threads $T_M$ with a problem size $n$ of 16384. Recall that $P=N\times M\times T_M$}
+	\centering
+	\begin{tabular}{r|c|c|c}
+	$P$	&$\tau_P$ [s]	&	$S_p=\tau_1/\tau_p$	&	$\eta_p=S_p/P$	\\
+\hline
+	1	&	790.7	&	1.00	&	1.00	\\
+	2	&	416.1	&	1.90	&	0.95	\\
+	3	&	289.9	&	2.73	&	0.91	\\
+	4	&	226.3	&	3.49	&	0.87	\\
+	6	&	164.6	&	4.80	&	0.80	\\
+	8	&	132.6	&	5.96	&	0.75	\\
+	10	&	114.6	&	6.90	&	0.69	\\
+	12	&	100.9	&	7.84	&	0.65	\\
+	\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+	\label{fig:nodespeed}
+	\centering
+	\include{graphs/timing_single_node}
+	\caption{A plot of the speedup ($S_P$) and parallel efficency ($\eta_P$) for different amounts of processors ($P$) utilized. Take note that the second axis is different for $\eta_P$ and $S_P$.}
+\end{figure}
+
+Using multiple MPI-processes on a single node offers a better speedup since there is much less overhead and communication time is small. This is backed up by the numerical results as listed in table \ref{tab:MPIspeedup}. A plot of the parallel efficency can be seen in figure \ref{fig:MPIspeedup}. Observe that the parallel efficency is close to unity when all the processors on the node are run as MPI-processes as compared to when all the processors are used as OpenMP threads when the parallel efficency is down to 0.65.
+
+\begin{table}[htbp]
+	\label{tab:MPIspeedup}
+	\caption{Listing of timing results as a comparison between MPI ($M$) and OpenMP processes per thread ($T_M$). Results are obtained using only one node and a problem size of $n=16384$.}
+	\centering
+	\begin{tabular}{r|r|r|c|c|c}
+	$M$	&	$T_M$	&	$P$	&	$\tau_P$ [s] & $S_p=\tau_1/\tau_p$	&	$\eta_p=S_p/P$	\\
+\hline
+	1&	12&	12&	100.9&	7.84&	0.65\\
+	2&	6&	12&	82.7&	9.56&	0.80\\
+	3&	4&	12&	76.2&	10.38&	0.86\\
+	4&	3&	12&	72.8&	10.86&	0.91\\
+	6&	2&	12&	69.6&	11.36&	0.95\\
+	12&	1&	12&	66.4&	11.91&	0.99\\
+	\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+	\label{fig:MPIspeedup}
+	\centering
+	\include{graphs/timing_MPI}
+	\caption{A plot of the parallel efficency $\eta_P$ as a function of MPI-processes ($M$) on a single node. The total number of utilized processors is always $P=12$ as the processors not used as a MPI-process is utilized as a thread.}
+\end{figure}
+
+When the number of nodes is increased one would expect the the parallel efficency to drop substantially as there is network latency involved. By looking at timing results obtained from running the program over three nodes in table \ref{tab:nodes} a decreased efficency is observed, as the number of processors is tripled, the run time is only about halved as compared to table \ref{tab:MPIspeedup}. Again as with the single node case, running the algorithm with only MPI-processes yields the fastest result.
+
+\begin{table}[htbp]
+	\label{tab:nodes}
+	\caption{Timing results on three nodes ($N=3$) with different combinations of MPI-processes per node ($M$) and OpenMP threads per MPI-process ($T_M$). The total number of processors utilized is 36 in each case (recall that $P=N\times M\times T_M$).}
+	\centering
+	\begin{tabular}{r|r|c|c|c}
+	$M$	&	$T_M$	&	$\tau_P$ [s] & $S_p=\tau_1/\tau_p$	&	$\eta_p=S_p/P$	\\
+\hline
+	1	&12	&42.9	&18.43	&0.51\\
+	2	&6	&36.6	&21.60	&0.60\\
+	3	&4	&34.4	&22.99	&0.64\\
+	4	&3	&33.3	&23.74	&0.66\\
+	6	&2	&32.6	&24.25	&0.67\\
+	12	&1	&32.0	&24.71	&0.69\\
+	\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+	\centering
+	\include{graphs/peff}
+	\label{fig:peff}
+	\caption{Parallel efficency $\eta_p$ for two configurations of MPI-processes ($M$) and OpenMP threads per MPI-process ($T_M$) as a function of problem size.}
+\end{figure}
+
+From figure \ref{fig:peff} it can be observed that for small problem sizes ($n<1024$) there is very little payoff in using many processors as the prallel efficency is shown to be very low. The hybrid model has a somewhat better payoff for smaller problems, but it is still inefficient.
+
+\subsection{Summary}
+The solver is found to give correct results within the error estimate for an analytical solvable seed function. When on a single node the best speedup is acheieved by using all available processors as MPI-processes instead of spawning OpenMP threads. This is because of increased overhead and iterations in the transpose iteration when using OpenMP-threads compared to MPI-processes. On three nodes the best result is also obtained when all processors are utilized as MPI-processes, as can be seen in table \ref{tab:nodes}. Parallel efficency however suffers when using more than one node because of network latency. Parallel efficency also suffer when the problem size is relatively small, this is due to the added overhead when using multiple processors drowning the time used for actually solving the problem.
+
+Tests were made using more than 36 processors with $n=16384$, the results indicate that the parallel efficency $\eta_p$ drops slowly when increasing the number of processors used. Using three nodes the best $\eta_P$ obtained was 0.69, when using 6 nodes this was down to 0.62 using only the MPI model. On 12 nodes the best efficency was obtained using a hybrid model with $M=6$ and $T_M=2$ with $\eta_P=0.56$, compared to $\eta_p=0.46$ using the pure MPI model. This behaviour can be explained using figure \ref{fig:peff} where the problem size for each node is small enough that the hybrid model offers advantage.
+
+The transpose operation uses a triple nested for-loop that is executed approximately $M\cdot (n/M)\cdot(n/M) = n^2/M$ times each time it is called. On a signle node with a problem size of $n=16384=2^{14}$ running on only OpenMP threads this amounts to 268 million iterations compared to 22 million iterations running only MPI-processes ($M=12$), which can explain why the pure MPI model runs faster than the hybrid model on few nodes.
+
+On a distributed system there will be network latency to counter the effect of less iterations of the triple nested loop. By looking at table \ref{tab:nodes} the hybrid model does not lie far behind the pure MPI-model, which indicates that network latency is a substantial factor when it comes to parallel computing.
+
+\newpage
+\section{Solver capabilities}
+The solver can solve for different seed functions $f(x,y)$ by changing the \textit{return} statement in the \textit{evalFunc} function in the code. This will change the $G$ matrix in step one to correspond with the given function. The max pointwise error will show false information unless changed as well. Some plots of solutions for different seed functions can be found in figure \ref{fig:sol1} to \ref{fig:sol4}. Axis desciption is dropped since there is no real information in the plots and they look prettier that way.
+	
+\begin{figure}[h]
+	\centering
+	\include{graphs/solution1}
+	\caption{Plot of the solution $u$ for $f(x,y) = 5\pi^2\sin(\pi x)\sin(2\pi y)$. Problem size $n=64$.}
+	\label{fig:sol1}
+\end{figure}
+
+\begin{figure}[bp]
+	\centering
+	\include{graphs/solution2}
+	\caption{Plot of the solution $u$ for $f(x,y) = 15 \text{ if } x > 0.4 \text{ and } y > 0.4$ and 0 elsewhere. Problem size $n=64$.}
+	\label{fig:sol2}
+\end{figure}
+
+%\begin{figure}[p]
+%	\centering
+%	\include{graphs/solution3}
+%	\caption{Plot of the solution $u$ for $f(x,y) = \delta(x-0.25)\delta(y-0.5) - \delta(x-0.75)\delta(y-0.5)$ where $\delta(x) = 1 \text{ for } x=0$ and 0 elsewhere}
+%	\label{fig:sol3}
+%\end{figure}
+
+\begin{figure}[p]
+	\centering
+	\include{graphs/solution4}
+	\caption{Plot of the solution $u$ for $f(x,y) = \exp(1-x-y)-1$. Problem size $n=64$.}
+	\label{fig:sol4}
+\end{figure}
+
+
+\subsection{Extending capabilities and improving the solver}
+The current algorithm only support homogeneous Dirichlet boundary conditions ($u = 0 \text{ on } \partial\Omega$. The algorithm can be further generalized by adding support for non-homogeneous boundary conditions. This can be done by adding a lifting function to the right hand side of equation \eqref{eq:poisson} and storing all boundary elements. This would require some change to the code as the boundary is not stored and assumed equal to zero.
+
+Support for rectangular grids can be implemented by having two different step sizes, one for the $x$-direction, $h_x$, and one for the $y$-direction, $h_y$. There is already support for different grid length, but only for square domains $(0,L)\times(0,L)$, if the different step sizes are implemented it should be a short leap to be able to work on rectangular $(0,L_x)\times(0,L_y)$ domains.
+
+It's possible to modify the FST to allow for grid sizes different from $n=2^k,\quad k\in\mathbb{Z}^+$, but this comes at the cost of speed.
+
+A bottleneck of the solver is believed to lie in the transpose operation, if this can be improved, running the hybrid model will give better results on kongull than using the pure MPI model in more cases as there is less communication overhead needed in the hybrid model compared to the pure MPI model.
+
+Another improvement to the program would be to implement parallel I/O instead of the current solution where each MPI-process writes to its own file.
+
+\nocite{lecturenotes}
+\newpage
+\bibliography{aref}
+\bibliographystyle{plain}
+
+\begin{appendix}
+\section{Appendix}
+\subsection{C printout of the transpose operation}
+\begin{ccode}
+void transposeMPI(Matrix ut, Matrix u){
+	int len = ut.displ[ut.comm_size-1]+ut.count[ut.comm_size-1];
+	double* temp = (double*)malloc(len*sizeof(double));
+	double* temp2 = (double*)malloc(len*sizeof(double));
+	int l = 0;
+	int count = 0;
+	for (int i = 0; i < ut.comm_size; i++){
+		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
+			for (int k = 0; k < ut.sizes[i]; k++){
+				temp[count++] = u.data[j][k+l];
+			}
+		}
+		l += ut.sizes[i];
+	}
+
+	MPI_Alltoallv(temp,u.count,u.displ,MPI_DOUBLE,temp2,
+	ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
+	
+	count = 0;
+	for (int i = 0; i < ut.m; i++){
+		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
+			ut.data[j][i] = temp2[count++];
+		}
+	}
+	free(temp);
+	free(temp2);
+}
+\end{ccode}
+
+\end{appendix}
+
+\end{document}

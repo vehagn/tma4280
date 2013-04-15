@@ -1,0 +1,96 @@
+\relax 
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\@input{graphs/frontpage.aux}
+\select@language{english}
+\@writefile{toc}{\select@language{english}}
+\@writefile{lof}{\select@language{english}}
+\@writefile{lot}{\select@language{english}}
+\@writefile{toc}{\contentsline {section}{\numberline {1}The 2D Poisson problem}{3}{section.1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}Introduction}{3}{subsection.1.1}}
+\newlabel{eq:poisson}{{1}{3}{Introduction\relax }{equation.1.1}{}}
+\newlabel{eq:discLap}{{2}{3}{Introduction\relax }{equation.1.2}{}}
+\newlabel{fig:grid}{{1.1}{3}{Introduction\relax }{equation.1.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1.1.1}{\ignorespaces Illustration of the 5-point stencil on an $n\times n$ grid}}{3}{figure.1.1.1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Diagonalization}{3}{subsection.1.2}}
+\newlabel{eq:Tmatrix}{{4}{3}{Diagonalization\relax }{equation.1.4}{}}
+\newlabel{eq:TUUTG}{{6}{4}{Diagonalization\relax }{equation.1.6}{}}
+\newlabel{eq:TQLQ}{{7}{4}{Diagonalization\relax }{equation.1.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}Eigenvalues and eigenvectors}{4}{subsection.1.3}}
+\newlabel{eq:eigvec}{{9}{4}{Eigenvalues and eigenvectors\relax }{equation.1.9}{}}
+\newlabel{eq:normeigvec}{{11}{4}{Eigenvalues and eigenvectors\relax }{equation.1.11}{}}
+\newlabel{eq:Q}{{12}{4}{Eigenvalues and eigenvectors\relax }{equation.1.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.4}Discrete Sine transform}{5}{subsection.1.4}}
+\newlabel{eq:DST}{{13}{5}{Discrete Sine transform\relax }{equation.1.13}{}}
+\newlabel{eq:DSTfunc}{{14}{5}{Discrete Sine transform\relax }{equation.1.14}{}}
+\newlabel{eq:DSTfunciv}{{15}{5}{Discrete Sine transform\relax }{equation.1.15}{}}
+\newlabel{eq:QS}{{16}{5}{Discrete Sine transform\relax }{equation.1.16}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Implementation}{6}{section.2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Overview}{6}{subsection.2.1}}
+\newlabel{fig:architecture}{{2.1}{6}{Overview\relax }{subsection.2.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.1.1}{\ignorespaces Illustration of the program architecture. The left shows how the grid is split up among the MPI-processes, notice that there's an uneven distribution since $7^2$ is not divisible by $4$. The right figure shows how each MPI-process spawns three thread of its own and that each MPI-process communicates with all the other MPI-processes. The number of threads spawned by each MPI-process is arbitrary.}}{6}{figure.2.1.1}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.1.1}Transpose}{6}{subsubsection.2.1.1}}
+\citation{kongull}
+\newlabel{fig:transpose}{{2.1.1}{7}{Transpose\relax }{subsubsection.2.1.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.1.2}{\ignorespaces A schematical layout of how the transpose operation is carried out over the MPI-processes.}}{7}{figure.2.1.2}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Numerical results and performance analysis}{7}{section.3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Hardware}{7}{subsection.3.1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Numerical results}{7}{subsection.3.2}}
+\@input{graphs/error.aux}
+\@input{graphs/time1.aux}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2.1}{\ignorespaces Pointwise error as a function of grid size for two different processor configurations. Notice that the pointwise error for both configurations is proportional to $n^{-2}$ which indicates that there are no convergence issues since the algorithm predicts convergence on the order of $\mathcal  {O}(h^2)$ and $h$ is inversely proportional to $n$ in this case.}}{8}{figure.3.2.1}}
+\newlabel{fig:error}{{3.2.1}{8}{Pointwise error as a function of grid size for two different processor configurations. Notice that the pointwise error for both configurations is proportional to $n^{-2}$ which indicates that there are no convergence issues since the algorithm predicts convergence on the order of $\mathcal {O}(h^2)$ and $h$ is inversely proportional to $n$ in this case}{figure.3.2.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3.2.1}{\ignorespaces Select runs of two different combinations of nodes ($N$), MPI-processes per node ($M$) and threads per MPI-process ($T_M$) for different problem sizes $n$. }}{8}{table.3.2.1}}
+\newlabel{tab:errorresults}{{3.2.1}{8}{Select runs of two different combinations of nodes ($N$), MPI-processes per node ($M$) and threads per MPI-process ($T_M$) for different problem sizes $n$}{table.3.2.1}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.1}Verification of correctness}{8}{subsubsection.3.2.1}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.2}Timing}{8}{subsubsection.3.2.2}}
+\@input{graphs/timing_single_node.aux}
+\@input{graphs/timing_MPI.aux}
+\@input{graphs/peff.aux}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2.2}{\ignorespaces Total runtime $\tau $ divided by $n^2\qopname  \relax o{log}n$ as a function of $n$. Observe that the runtime per $n^2\qopname  \relax o{log}n$ appear to converge to a constant for large $n$ which is a strong indicator that the program runs in $\mathcal  {O}(n^2 \qopname  \relax o{log}n)$ time. The increased value of $\tau /n^2\qopname  \relax o{log}n$ for $P=36$ for small $n$ is due to increased overhead and network latency when having to communicate between more nodes. This overhead is however neglible when the problem size increases.}}{9}{figure.3.2.2}}
+\newlabel{fig:time1}{{3.2.2}{9}{Total runtime $\tau $ divided by $n^2\log n$ as a function of $n$. Observe that the runtime per $n^2\log n$ appear to converge to a constant for large $n$ which is a strong indicator that the program runs in $\mathcal {O}(n^2 \log n)$ time. The increased value of $\tau /n^2\log n$ for $P=36$ for small $n$ is due to increased overhead and network latency when having to communicate between more nodes. This overhead is however neglible when the problem size increases}{figure.3.2.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.3}Speedup and parallel efficency}{9}{subsubsection.3.2.3}}
+\newlabel{tab:nodespeedup}{{3.2.3}{10}{Speedup and parallel efficency\relax }{equation.3.19}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3.2.2}{\ignorespaces Timing results on a single node ($N=1$) using one MPI-process ($M=1$) and different amounts of threads $T_M$ with a problem size $n$ of 16384. Recall that $P=N\times M\times T_M$}}{10}{table.3.2.2}}
+\newlabel{fig:nodespeed}{{3.2.3}{10}{Speedup and parallel efficency\relax }{table.3.2.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2.3}{\ignorespaces A plot of the speedup ($S_P$) and parallel efficency ($\eta _P$) for different amounts of processors ($P$) utilized. Take note that the second axis is different for $\eta _P$ and $S_P$.}}{10}{figure.3.2.3}}
+\newlabel{tab:MPIspeedup}{{3.2.3}{10}{Speedup and parallel efficency\relax }{figure.3.2.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3.2.3}{\ignorespaces Listing of timing results as a comparison between MPI ($M$) and OpenMP processes per thread ($T_M$). Results are obtained using only one node and a problem size of $n=16384$.}}{10}{table.3.2.3}}
+\newlabel{fig:MPIspeedup}{{3.2.3}{11}{Speedup and parallel efficency\relax }{table.3.2.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2.4}{\ignorespaces A plot of the parallel efficency $\eta _P$ as a function of MPI-processes ($M$) on a single node. The total number of utilized processors is always $P=12$ as the processors not used as a MPI-process is utilized as a thread.}}{11}{figure.3.2.4}}
+\newlabel{tab:nodes}{{3.2.3}{11}{Speedup and parallel efficency\relax }{figure.3.2.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3.2.4}{\ignorespaces Timing results on three nodes ($N=3$) with different combinations of MPI-processes per node ($M$) and OpenMP threads per MPI-process ($T_M$). The total number of processors utilized is 36 in each case (recall that $P=N\times M\times T_M$).}}{11}{table.3.2.4}}
+\newlabel{fig:peff}{{3.2.3}{12}{Speedup and parallel efficency\relax }{table.3.2.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2.5}{\ignorespaces Parallel efficency $\eta _p$ for two configurations of MPI-processes ($M$) and OpenMP threads per MPI-process ($T_M$) as a function of problem size.}}{12}{figure.3.2.5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Summary}{12}{subsection.3.3}}
+\@input{graphs/solution1.aux}
+\@input{graphs/solution2.aux}
+\@input{graphs/solution4.aux}
+\citation{lecturenotes}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Solver capabilities}{13}{section.4}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.0.1}{\ignorespaces Plot of the solution $u$ for $f(x,y) = 5\pi ^2\qopname  \relax o{sin}(\pi x)\qopname  \relax o{sin}(2\pi y)$. Problem size $n=64$.}}{13}{figure.4.0.1}}
+\newlabel{fig:sol1}{{4.0.1}{13}{Plot of the solution $u$ for $f(x,y) = 5\pi ^2\sin (\pi x)\sin (2\pi y)$. Problem size $n=64$}{figure.4.0.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Extending capabilities and improving the solver}{13}{subsection.4.1}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.0.2}{\ignorespaces Plot of the solution $u$ for $f(x,y) = 15 \text  { if } x > 0.4 \text  { and } y > 0.4$ and 0 elsewhere. Problem size $n=64$.}}{14}{figure.4.0.2}}
+\newlabel{fig:sol2}{{4.0.2}{14}{Plot of the solution $u$ for $f(x,y) = 15 \text { if } x > 0.4 \text { and } y > 0.4$ and 0 elsewhere. Problem size $n=64$}{figure.4.0.2}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.0.3}{\ignorespaces Plot of the solution $u$ for $f(x,y) = \qopname  \relax o{exp}(1-x-y)-1$. Problem size $n=64$.}}{14}{figure.4.0.3}}
+\newlabel{fig:sol4}{{4.0.3}{14}{Plot of the solution $u$ for $f(x,y) = \exp (1-x-y)-1$. Problem size $n=64$}{figure.4.0.3}{}}
+\bibdata{aref}
+\bibcite{lecturenotes}{1}
+\bibcite{kongull}{2}
+\bibstyle{plain}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Appendix}{15}{appendix.A}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}C printout of the transpose operation}{15}{subsection.A.1}}
