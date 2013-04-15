@@ -84,7 +84,7 @@ int main (int argc, char** argv){
         sum += u.count[i];
     }
 
-    u.data = createMatrix(local_m, m);
+    u.data = createMatrix(local_m+1, m);
 
     //Calculate eigenvalues.
     #pragma omp parallel for schedule(static)
@@ -144,18 +144,18 @@ int main (int argc, char** argv){
     }
     double totTime = MPI_Wtime()-startTime;
     double t = totTime;
+    double max;
     MPI_Reduce(&t, &totTime, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Allreduce(&umax, &umax, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&umax, &max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
     if (rank == 0){
-        printf("POISSON2\n");
-	printf("Processors (nodes,threads):   %i*%i\n",size,threads);
+	printf("Processors (MPI,threads):     %i*%i=%i\n",size,threads,size*threads);
         printf("Jobsize:                      %i/%i\n",local_m,m);
         printf("Average runtime:              %.8f s\n", totTime/size);
-        printf("Max pointwise error:          %.14f \n\n", umax);
+        printf("Max pointwise error:          %.14f \n\n", max);
     }
 
-    //printToFile(u.data, local_m, m,rank);
+    //printToFile(u.data, local_m, m, rank);
 
     free(u.data);
     free(lambda);
@@ -187,45 +187,40 @@ double **createMatrix(int n1, int n2){
 }
 
 double evalFunc(int i, int j, double h, int displ, double pi){
-    double x = (double)(j+1)*h;
-    double y = (double)(displ+i+1)*h;
-    //printf("(%1.8f, %1.8f)\t", x,y);
-    //if (x > 0.4 && y > 0.4){return 15.;}
-    //if (x == 0.25 && y == 0.25){printf("(%1.8f, %1.8f) = 10\n", x,y);return -5.;}
-    //if (x == 0.75 && y == 0.75){printf("(%1.8f, %1.8f) = -10\n", x,y);return 8.;}
-    //return exp(1.-x-y)-1.;
-    //return -(2.0-4*pi*pi*x*(x-1.0))*sin(2.0*pi*y);
+	double x = (double)(j+1)*h;
+	double y = (double)(displ+i+1)*h;
+	//printf("(%1.8f, %1.8f)\t", x,y);
+	//if (x > 0.4 && y > 0.4){return 15.;}
+	//if (x == 0.25 && y == 0.25){printf("(%1.8f, %1.8f) = 10\n", x,y);return -5.;}
+	//if (x == 0.75 && y == 0.75){printf("(%1.8f, %1.8f) = -10\n", x,y);return 8.;}
+	//return exp(1.-x-y)-1.;
+	//return -(2.0-4*pi*pi*x*(x-1.0))*sin(2.0*pi*y);
 	return 5.0*pi*pi*sin(pi*x)*sin(2.0*pi*y);
-    //return 1.0;
+	//return 1.0;
 
 }
 
 void transposeMPI(Matrix ut, Matrix u){
 	int len = ut.displ[ut.comm_size-1]+ut.count[ut.comm_size-1];
-	double* temp = (double*)malloc(len*sizeof(double));
-	double* temp2 = (double*)malloc(len*sizeof(double));
+	double* sendbuff = (double*)malloc(len*sizeof(double));
+	double* recvbuff = (double*)malloc(len*sizeof(double));
 	int l = 0;
-	int count = 0;
-	unsigned int iters = 0;
-	for (int i = 0; i < ut.comm_size; i++){
+	for (int i,count = 0; i < ut.comm_size; i++){
 		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
 			for (int k = 0; k < ut.sizes[i]; k++){
-				temp[count++] = u.data[j][k+l];
-				iters += 1;
+				sendbuff[count++] = u.data[j][k+l];
 			}
 		}
 		l += ut.sizes[i];
 	}
-    //printf("Transpose iterations: %u \n",iters);
-	MPI_Alltoallv(temp,u.count,u.displ,MPI_DOUBLE,temp2,ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
-	free(temp);
-	count = 0;
-	for (int i = 0; i < ut.m; i++){
+	MPI_Alltoallv(sendbuff,u.count,u.displ,MPI_DOUBLE,recvbuff,ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
+	free(sendbuff);
+	for (int i,count = 0; i < ut.m; i++){
 		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
-			ut.data[j][i] = temp2[count++];
+			ut.data[j][i] = recvbuff[count++];
 		}
 	}
-	free(temp2);
+	free(recvbuff);
 }
 
 void printToFile(double**u, int n, int m, int rank){
