@@ -148,7 +148,8 @@ int main (int argc, char** argv){
     MPI_Allreduce(&umax, &umax, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
     if (rank == 0){
-        printf("Processors (nodes,threads):   %i*%i\n",size,threads);
+        printf("POISSON2\n");
+	printf("Processors (nodes,threads):   %i*%i\n",size,threads);
         printf("Jobsize:                      %i/%i\n",local_m,m);
         printf("Average runtime:              %.8f s\n", totTime/size);
         printf("Max pointwise error:          %.14f \n\n", umax);
@@ -202,7 +203,7 @@ double evalFunc(int i, int j, double h, int displ, double pi){
 void transposeMPI(Matrix ut, Matrix u){
 	int len = ut.displ[ut.comm_size-1]+ut.count[ut.comm_size-1];
 	double* temp = (double*)malloc(len*sizeof(double));
-
+	double* temp2 = (double*)malloc(len*sizeof(double));
 	int l = 0;
 	int count = 0;
 	unsigned int iters = 0;
@@ -215,16 +216,16 @@ void transposeMPI(Matrix ut, Matrix u){
 		}
 		l += ut.sizes[i];
 	}
-    printf("Transpose iterations: %u \n",iters);
-	MPI_Alltoallv(temp,u.count,u.displ,MPI_DOUBLE,temp,ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
-
+    //printf("Transpose iterations: %u \n",iters);
+	MPI_Alltoallv(temp,u.count,u.displ,MPI_DOUBLE,temp2,ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
+	free(temp);
 	count = 0;
 	for (int i = 0; i < ut.m; i++){
 		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
-			ut.data[j][i] = temp[count++];
+			ut.data[j][i] = temp2[count++];
 		}
 	}
-	free(temp);
+	free(temp2);
 }
 
 void printToFile(double**u, int n, int m, int rank){
