@@ -357,7 +357,7 @@ The C code listing for the transpose can be found in the appendix.
 \subsection{Hardware}
 All the numerical results are obtained by running the program on the high performance computer \textit{kongull}. 
 
-Kongull consist of 93 compute nodes, of which 44 nodes have 48 GiB each, while the other 49 nodes have 24 GiB of memory. Each node consists of a HP DL165 G6 server with 2 6-core 2.4 GHz AMD Opteron 2431 (Istanbul) processors, with 6 512 KiB L1 cache and a common 6 MiB L3-cache. The difference in memory is of low concern for this report as the program will not exceed 5 GiB memory on a single node. Assuming a problem size of $n=16384=2^{14}$ the memory requirements for storing the matrix is $8\text{ Bytes}\cdot (2^{14})^2 = 2^{31} \text{ Bytes} = 2 \text{ GiB}$. While doing the transpose the memory requirement can double as the send buffer is constructed. The other variables stored are neglible compared to this as they have memory requirements of at most $\mathcal{O}(n)$, an upper estimate for the other variables of 1 GiB is therefore more than sufficient.
+Kongull consist of 93 compute nodes, of which 44 nodes have 48 GiB each, while the other 49 nodes have 24 GiB of memory. Each node consists of a HP DL165 G6 server with 2 6-core 2.4 GHz AMD Opteron 2431 (Istanbul) processors, with 6 512 KiB L1 cache and a common 6 MiB L3-cache. The difference in memory is of low concern for this report as the program will not exceed 7 GiB memory on a single node. Assuming a problem size of $n=16384=2^{14}$ the memory requirements for storing the matrix is $8\text{ Bytes}\cdot (2^{14})^2 = 2^{31} \text{ Bytes} = 2 \text{ GiB}$. While doing the transpose memory requirement will peak at triple this because both the send and recieve buffers need room to store the matrix. The other variables stored are neglible compared to this as they have memory requirements of at most $\mathcal{O}(n)$. Estimating a generous 1 GiB for the rest of the variables should therefore be more than enough, and hence 24 GiB of memory or more is never obtained.
 
 The internal network of the kongull cluster is based on a fat tree layout, with slower connections towards the \textit{leaves} of the connection tree. Each login- and I/O-node is connected to a central switch, HP ProCurve 6600-24XG, with 10GbE SPF+ connectors. Two rack switches, ProCurve 2910al-48G are connected to the central switch with 10GbE SPF+ connectors. Each compute node is connected to a rack switch with 1Gb Ethernet network connection to the outside world, via two SR tranceivers on the central switch.\cite{kongull}
 Network latency is expected to be a bottleneck for the solver.
@@ -509,9 +509,9 @@ The solver is found to give correct results within the error estimate for an ana
 
 Tests were made using more than 36 processors with $n=16384$, the results indicate that the parallel efficency $\eta_p$ drops slowly when increasing the number of processors used. Using three nodes the best $\eta_P$ obtained was 0.69, when using 6 nodes this was down to 0.62 using only the MPI model. On 12 nodes the best efficency was obtained using a hybrid model with $M=6$ and $T_M=2$ with $\eta_P=0.56$, compared to $\eta_p=0.46$ using the pure MPI model. This behaviour can be explained using figure \ref{fig:peff} where the problem size for each node is small enough that the hybrid model offers advantage.
 
-The transpose operation uses a triple nested for-loop that is executed approximately $M\cdot (n/M)\cdot(n/M) = n^2/M$ times each time it is called. On a signle node with a problem size of $n=16384=2^{14}$ running on only OpenMP threads this amounts to 268 million iterations compared to 22 million iterations running only MPI-processes ($M=12$), which can explain why the pure MPI model runs faster than the hybrid model on few nodes.
+The transpose operation uses a triple nested for-loop that is executed approximately $M\cdot (n/M)\cdot(n/M) = n^2/M$ times each time the transpose operations is called. 
 
-On a distributed system there will be network latency to counter the effect of less iterations of the triple nested loop. By looking at table \ref{tab:nodes} the hybrid model does not lie far behind the pure MPI-model, which indicates that network latency is a substantial factor when it comes to parallel computing.
+The transpose operation contains a triple nested for-loop that can not be split up among OpenMP threads. This triple nested for-loop is is executed approximately $M\cdot (n/M)\cdot(n/M) = n^2/M$ times per MPI-process each time the transpose operation is called upon. with a problem size of $n=16384=2^{14}$ and on a signle node, using only one MPI-process and 12 threads this amount to once processor having to execute the triple nested for-loop approximately 268 million times while the 11 others are idle. Using a pure MPI-model on the other hand, each processor only need to run 22 million iterations and it can be done in parallel, so the MPI-model is much more load balanced for this operation. However on a distributed system there will be network latency to counter the effect parallelisation of the triple nested loop since more MPI-processes means more network traffic. By looking at table \ref{tab:nodes} the hybrid model does not lie far behind the pure MPI-model, which indicates that network latency is a substantial factor when it comes to parallel computing.
 
 \newpage
 \section{Solver capabilities}
@@ -568,30 +568,25 @@ Another improvement to the program would be to implement parallel I/O instead of
 \begin{ccode}
 void transposeMPI(Matrix ut, Matrix u){
 	int len = ut.displ[ut.comm_size-1]+ut.count[ut.comm_size-1];
-	double* temp = (double*)malloc(len*sizeof(double));
-	double* temp2 = (double*)malloc(len*sizeof(double));
+	double* sendbuff = (double*)malloc(len*sizeof(double));
+	double* recvbuff = (double*)malloc(len*sizeof(double));
 	int l = 0;
-	int count = 0;
-	for (int i = 0; i < ut.comm_size; i++){
+	for (int i = 0,count = 0; i < ut.comm_size; i++){
 		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
 			for (int k = 0; k < ut.sizes[i]; k++){
-				temp[count++] = u.data[j][k+l];
+				sendbuff[count++] = u.data[j][k+l];
 			}
 		}
 		l += ut.sizes[i];
 	}
-
-	MPI_Alltoallv(temp,u.count,u.displ,MPI_DOUBLE,temp2,
-	ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
-	
-	count = 0;
-	for (int i = 0; i < ut.m; i++){
+	MPI_Alltoallv(sendbuff,u.count,u.displ,MPI_DOUBLE,recvbuff,ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
+	free(sendbuff);
+	for (int i = 0,count = 0; i < ut.m; i++){
 		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
-			ut.data[j][i] = temp2[count++];
+			ut.data[j][i] = recvbuff[count++];
 		}
 	}
-	free(temp);
-	free(temp2);
+	free(recvbuff);
 }
 \end{ccode}
 

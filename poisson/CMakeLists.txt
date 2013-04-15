@@ -61,4 +61,3 @@ MACRO(ADD_APP APP)
 ENDMACRO(ADD_APP)
 
 ADD_APP(poisson)
-ADD_APP(poisson2)
