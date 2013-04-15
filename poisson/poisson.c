@@ -65,25 +65,23 @@ int main (int argc, char** argv){
     u.comm_rank = ut.comm_rank = rank;
 
 
-    //Calculate number of rows each processor should have.
+    //Calculate number of rows each processor should own.
     for (int i = 0; i < size; i++){
         u.sizes[i] = ut.sizes[i] = local_m;
         if (i < m%local_m)
             u.sizes[i] = ut.sizes[i] += 1;
         globalDispl[i+1] = globalDispl[i] + u.sizes[i];
     }
+    if ((local_m*size < m) && (rank < m%local_m))
+        local_m++;
 
-    //Calculate how many elts. to send/recv and processor displ.
+    //Calculate how many elts. to send/recv and processor displacement.
     int sum = 0;
     for (int i = 0; i < size; i++){
         u.count[i] = ut.count[i] = u.sizes[rank]*u.sizes[i];
         u.displ[i] = ut.displ[i] = sum;
         sum += u.count[i];
     }
-
-    //Calculate local number of rows.
-    if ((local_m*size < m) && (rank < m%local_m))
-        local_m++;
 
     u.data = createMatrix(local_m, m);
     ut.data = createMatrix(local_m, m);
@@ -93,6 +91,8 @@ int main (int argc, char** argv){
     for (int i = 0; i < m; i++){
         lambda[i] = 2.0*(1.0-cos((i+1)*pi*h));
     }
+
+    //Initialize G
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < local_m; i++){
         for (int j = 0; j < m; j++){
@@ -101,7 +101,7 @@ int main (int argc, char** argv){
     }
     double startTime = MPI_Wtime();
 
-    //Step 1) G = QtGQ = S⁻¹((S(G))t)
+    //Step 1) G~t = QtGQ = S⁻¹((S(G))t)
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < local_m; i++) {
         fst_(u.data[i], &n, z[omp_get_thread_num()], &nn);
@@ -113,15 +113,15 @@ int main (int argc, char** argv){
         fstinv_(ut.data[i], &n, z[omp_get_thread_num()], &nn);
     }
 
-    //Step 2) u_ij = g_ij / (l_i + l_j)
+    //Step 2) ũ_ji = g~_ji / (l_j + l_i)
     #pragma omp parallel for schedule(static)
-    for (int i=0; i < local_m; i++){
-        for (int j=0; j < m; j++){
-            ut.data[i][j] /= (lambda[(int)globalDispl[rank]+i]+lambda[j]);
+    for (int j=0; j < local_m; j++){
+        for (int i=0; i < m; i++){
+            ut.data[j][i] /= (lambda[(int)globalDispl[rank]+j]+lambda[i]);
         }
     }
 
-    //Step 3) U = QUQ^T = S⁻¹((S(Ut))t)
+    //Step 3) U = QŨQ^T = S⁻¹((S(Ut))t)
     #pragma omp parallel for schedule(static)
     for (int i=0; i < local_m; i++){
         fst_(ut.data[i], &n, z[omp_get_thread_num()], &nn);
