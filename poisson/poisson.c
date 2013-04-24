@@ -204,8 +204,7 @@ void transposeMPI(Matrix ut, Matrix u){
 	int len = ut.displ[ut.comm_size-1]+ut.count[ut.comm_size-1];
 	double* sendbuff = (double*)malloc(len*sizeof(double));
 	double* recvbuff = (double*)malloc(len*sizeof(double));
-	int l = 0;
-	for (int i = 0,count = 0; i < ut.comm_size; i++){
+	for (int i = 0, count = 0, l=0; i < ut.comm_size; i++){
 		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
 			for (int k = 0; k < ut.sizes[i]; k++){
 				sendbuff[count++] = u.data[j][k+l];
@@ -215,7 +214,7 @@ void transposeMPI(Matrix ut, Matrix u){
 	}
 	MPI_Alltoallv(sendbuff,u.count,u.displ,MPI_DOUBLE,recvbuff,ut.count,ut.displ,MPI_DOUBLE,MPI_COMM_WORLD);
 	free(sendbuff);
-	for (int i = 0,count = 0; i < ut.m; i++){
+	for (int i = 0, count = 0; i < ut.m; i++){
 		for (int j = 0; j < ut.sizes[ut.comm_rank]; j++){
 			ut.data[j][i] = recvbuff[count++];
 		}
@@ -238,36 +237,3 @@ void printToFile(double**u, int n, int m, int rank){
 	}
 	fclose(file);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
